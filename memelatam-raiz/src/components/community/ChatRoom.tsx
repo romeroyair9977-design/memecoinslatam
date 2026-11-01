@@ -10,6 +10,9 @@ import { renderBody } from '@/lib/text';
 import { cn, formatAge } from '@/lib/utils';
 import { REACTION_EMOJIS, REPORT_REASONS, type ChatMessage, type ReactionRow } from '@/types/community';
 
+/** Forma mínima del payload de Realtime (compatible con cualquier versión de supabase-js). */
+type RealtimeChange = { new?: unknown; old?: unknown };
+
 export interface RoomUser { id: string; username: string; isAdmin: boolean }
 
 interface Props {
@@ -83,17 +86,17 @@ export function ChatRoom({ communityId, channel, initial, me, canWrite, isMod, l
     const filter = `community_id=eq.${communityId}`;
     const ch = sb
       .channel(`room:${communityId}:${channel}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter }, async (p) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter }, async (p: RealtimeChange) => {
         const row = p.new as Omit<ChatMessage, 'author' | 'reactions'>;
         if (row.channel !== channel) return;
         const author = await getAuthor(row.user_id);
         setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, { ...row, author, reactions: [] }]));
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter }, (p) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter }, (p: RealtimeChange) => {
         const row = p.new as { id: string; deleted_at: string | null };
         setMessages((prev) => prev.map((m) => (m.id === row.id ? { ...m, deleted_at: row.deleted_at } : m)));
       })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'reactions', filter }, (p) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'reactions', filter }, (p: RealtimeChange) => {
         const r = p.new as ReactionRow;
         setMessages((prev) =>
           prev.map((m) =>
@@ -104,7 +107,7 @@ export function ChatRoom({ communityId, channel, initial, me, canWrite, isMod, l
         );
       })
       // Los DELETE no admiten filtro en Realtime; con REPLICA IDENTITY FULL llegan completos y filtramos aquí.
-      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'reactions' }, (p) => {
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'reactions' }, (p: RealtimeChange) => {
         const r = p.old as Partial<ReactionRow>;
         setMessages((prev) =>
           prev.map((m) =>

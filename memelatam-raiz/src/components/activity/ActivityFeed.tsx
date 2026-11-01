@@ -7,6 +7,9 @@ import { getBrowserSupabase } from '@/lib/supabase/client';
 import { cn, formatAge } from '@/lib/utils';
 import type { ActivityEvent } from '@/types/community';
 
+/** Forma mínima del payload de Realtime (compatible con cualquier versión de supabase-js). */
+type RealtimeChange = { new?: unknown; old?: unknown };
+
 const STANCE_TXT = { alcista: 'alcista', bajista: 'bajista', cuidado: 'de precaución' } as const;
 const STANCE_CLS = { alcista: 'text-emerald-300', bajista: 'text-rose-300', cuidado: 'text-amber-300' } as const;
 
@@ -44,7 +47,7 @@ export function ActivityFeed({ initial, compact, demo, onlyActors }: Props) {
     if (!sb || demo) return;
     const ch = sb
       .channel(`activity:${onlyActors ? 'following' : 'all'}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_events' }, (p) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity_events' }, (p: RealtimeChange) => {
         const ev = p.new as ActivityEvent;
         if (onlyActors && (!ev.actor_id || !onlyActors.includes(ev.actor_id))) return;
         setEvents((prev) => (prev.some((e) => e.id === ev.id) ? prev : [ev, ...prev].slice(0, 50)));
