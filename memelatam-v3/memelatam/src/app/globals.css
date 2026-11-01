@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: dark; }
+
+html { background: #0d1221; }
+body {
+  @apply bg-bg text-ink font-sans antialiased;
+  font-variant-numeric: tabular-nums;
+}
+::selection { background: #ffb02e; color: #0d1221; }
+:focus-visible { outline: 2px solid #ffb02e; outline-offset: 2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* Ticker superior: se desplaza solo; se pausa al pasar el mouse y respeta "reducir movimiento". */
+@keyframes ml-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.ml-marquee-track { display: flex; width: max-content; animation: ml-marquee 60s linear infinite; }
+.ml-marquee:hover .ml-marquee-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .ml-marquee-track { animation: none; } }

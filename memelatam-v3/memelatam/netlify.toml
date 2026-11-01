@@ -1,0 +1,16 @@
+# Next.js en Netlify: el runtime se declara explícitamente para que siempre se instale.
+# No definas `publish` aquí ni en la UI de Netlify; el runtime lo gestiona solo.
+[build]
+  command = "npm run build"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
