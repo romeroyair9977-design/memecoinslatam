@@ -2,8 +2,9 @@
  * RugCheck (Solana). API pública sin key para reportes: https://api.rugcheck.xyz/swagger
  * Aporta: top holders con wallet, insiders, autoridades de mint/freeze y flag de rug.
  *
- * ⚠️ Los "top holders" suelen incluir la cuenta del pool/LP y la bonding curve, lo que infla la
- * concentración. TODO (iteración holders): excluir direcciones de `markets[].liquidityA/B` y de AMMs conocidos.
+ * Los "top holders" suelen incluir la cuenta del pool/LP, lo que infla la concentración: se excluyen las
+ * cuentas de `markets[]` (pubkey/liquidityA/liquidityB). Si RugCheck cambia el esquema, revisa este filtro.
+ * Pendiente: bonding curve de pump.fun y AMMs no listados en `markets`.
  */
 import { cached } from '../cache';
 import { TTL } from '../config';
@@ -15,7 +16,9 @@ interface RawReport {
   totalHolders?: number;
   mintAuthority?: string | null;
   freezeAuthority?: string | null;
-  topHolders?: { address: string; amount?: number; pct: number; insider?: boolean }[];
+  topHolders?: { address: string; owner?: string; amount?: number; pct: number; insider?: boolean }[];
+  /** Pools del token: sus cuentas (vaults/LP) NO son holders reales y inflan la concentración. */
+  markets?: { pubkey?: string; liquidityA?: string; liquidityB?: string; lp?: { lpLockedPct?: number } & Record<string, unknown> }[];
   risks?: { name: string; description?: string; level?: string }[];
 }
 
@@ -31,7 +34,13 @@ export async function getRugCheckOverview(mint: string): Promise<RugCheckOvervie
         revalidate: 300,
         timeoutMs: 10_000,
       });
-      const holders = (r.topHolders ?? []).map((h) => ({
+      // Excluye cuentas de pools/AMM (vaults de liquidez) para no inflar el top 10.
+      const poolAccounts = new Set(
+        (r.markets ?? []).flatMap((m) => [m.pubkey, m.liquidityA, m.liquidityB]).filter((x): x is string => !!x),
+      );
+      const holders = (r.topHolders ?? [])
+        .filter((h) => !poolAccounts.has(h.address) && !(h.owner && poolAccounts.has(h.owner)))
+        .map((h) => ({
         address: h.address,
         pct: h.pct, // RugCheck devuelve porcentaje (p.ej. 12.3 = 12.3%)
         amount: h.amount,

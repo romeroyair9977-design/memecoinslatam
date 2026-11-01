@@ -127,9 +127,10 @@ export type TokenResult =
   | { status: 'not_found' }
   | { status: 'error'; message: string };
 
-/** Versión liviana para tarjetas del dashboard. */
-export type Category = 'new' | 'traction' | 'migrating';
+/** Columnas del dashboard. */
+export type ColumnId = 'nuevas' | 'traccion' | 'migrando';
 
+/** Versión liviana para tarjetas del dashboard (el filtrado por columna se hace con estos campos). */
 export interface TokenSummary {
   chain: string;
   address: string;
@@ -141,18 +142,22 @@ export interface TokenSummary {
   marketCap: number;
   liquidityUsd: number;
   volume24h: number;
+  buys24h: number;
+  sells24h: number;
   txns24h: number;
   pairCreatedAt: number | null;
   dexId: string;
-  tags: Category[];
+  /** Cantidad de DEX distintos donde existe el token (señal de migración). */
+  dexCount: number;
+  /** % del supply en el top 10 de holders; null = desconocido (no se pudo consultar). */
+  top10Pct: number | null;
   activity: ActivityStatus;
   trendScore: number;
 }
 
 export interface Dashboard {
-  nuevas: TokenSummary[];
-  traccion: TokenSummary[];
-  migrando: TokenSummary[];
+  /** Todos los candidatos enriquecidos; el cliente los reparte en columnas según los filtros activos. */
+  tokens: TokenSummary[];
   trending: TokenSummary[];
   updatedAt: number;
 }

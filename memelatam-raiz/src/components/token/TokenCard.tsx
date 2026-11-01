@@ -1,5 +1,7 @@
 import Link from 'next/link';
-import type { TokenSummary } from '@/types/token';
+import { Users } from 'lucide-react';
+import type { ColumnId, TokenSummary } from '@/types/token';
+import { badgeFor, PREFERRED_TOP10 } from '@/lib/filters';
 import { chainLabel } from '@/lib/chains';
 import { cn, formatAge, formatPct, formatPrice, formatUsd } from '@/lib/utils';
 import { ActivityBadge } from './RiskBadge';
@@ -14,18 +16,35 @@ export function TokenAvatar({ src, symbol, size = 36 }: { src: string | null; sy
   );
 }
 
-export function TokenCard({ t }: { t: TokenSummary }) {
+interface CardProps {
+  t: TokenSummary;
+  members?: number;
+  /** Columna donde se muestra: decide el badge (Fantasma / Poca actividad / Con vida). */
+  column?: ColumnId;
+  /** Apareció en el último refresco automático. */
+  fresh?: boolean;
+}
+
+export function TokenCard({ t, members, column, fresh }: CardProps) {
   const up = t.change24h >= 0;
+  const pref = column ? PREFERRED_TOP10[column] : undefined;
+  const topOk = t.top10Pct !== null && pref !== undefined ? t.top10Pct <= pref : null;
   return (
     <Link
       href={`/token/${t.address}?chain=${t.chain}`}
-      className="block rounded-xl border border-line bg-panel p-3 transition-colors hover:border-brand/60"
+      className={cn(
+        'block rounded-xl border bg-panel p-3 transition-colors hover:border-brand/60',
+        fresh ? 'border-brand/70 shadow-[0_0_0_1px_rgba(255,176,46,0.35)]' : 'border-line',
+      )}
     >
       <div className="flex items-center gap-3">
         <TokenAvatar src={t.imageUrl} symbol={t.symbol} />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-medium">{t.symbol} <span className="text-sm font-normal text-muted">{t.name}</span></p>
-          <p className="text-xs text-muted">{chainLabel(t.chain)} · {formatAge(t.pairCreatedAt)}</p>
+          <p className="truncate font-medium">
+            {t.symbol} <span className="text-sm font-normal text-muted">{t.name}</span>
+            {fresh && <span className="ml-2 rounded bg-brand px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase text-bg">Nuevo</span>}
+          </p>
+          <p suppressHydrationWarning className="text-xs text-muted">{chainLabel(t.chain)} · {formatAge(t.pairCreatedAt)}</p>
         </div>
         <div className="text-right">
           <p className="text-sm">{formatPrice(t.priceUsd)}</p>
@@ -37,7 +56,27 @@ export function TokenCard({ t }: { t: TokenSummary }) {
         <div><dt className="text-muted">Liquidez</dt><dd>{formatUsd(t.liquidityUsd)}</dd></div>
         <div><dt className="text-muted">Vol 24h</dt><dd>{formatUsd(t.volume24h)}</dd></div>
       </dl>
-      <div className="mt-3"><ActivityBadge status={t.activity} /></div>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <ActivityBadge status={column ? badgeFor(column, t) : t.activity} />
+          {t.top10Pct !== null && (
+            <span
+              title="% del supply en los 10 mayores holders (sin contar pools)"
+              className={cn(
+                'rounded-full border px-2 py-0.5 text-xs',
+                topOk === null ? 'border-line text-muted' : topOk ? 'border-emerald-500/30 text-emerald-300' : 'border-amber-500/30 text-amber-300',
+              )}
+            >
+              Top10 {t.top10Pct.toFixed(0)}%
+            </span>
+          )}
+        </div>
+        {members !== undefined && (
+          <span className="flex items-center gap-1 text-xs text-muted" title="Miembros de su comunidad">
+            <Users className="h-3.5 w-3.5" aria-hidden />{members} {members === 1 ? 'miembro' : 'miembros'}
+          </span>
+        )}
+      </div>
     </Link>
   );
 }

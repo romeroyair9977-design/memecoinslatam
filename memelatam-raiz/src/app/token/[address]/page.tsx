@@ -7,12 +7,18 @@ import { TokenStats } from '@/components/token/TokenStats';
 import { HolderTable } from '@/components/token/HolderTable';
 import { NewsFeed } from '@/components/token/NewsFeed';
 import { ThesisSection } from '@/components/token/ThesisSection';
+import { JoinCommunityButton } from '@/components/community/JoinCommunityButton';
 import { ActivityBadge, RiskBadge } from '@/components/token/RiskBadge';
+import { getMe } from '@/lib/auth';
 import { chainLabel } from '@/lib/chains';
+import { MOCK_THESES } from '@/lib/mock';
+import { getFollowedWallets, getRole, getTheses, getTokenCommunity } from '@/lib/services/community';
+import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { SITE } from '@/lib/config';
 import { getTokenFull } from '@/lib/services/token';
 import { cn, formatPct, formatPrice } from '@/lib/utils';
 import type { RiskFlag } from '@/types/token';
+import { tokenKey } from '@/types/community';
 
 interface Props {
   params: { address: string };
@@ -69,6 +75,17 @@ export default async function TokenPage({ params, searchParams }: Props) {
   const p = t.pair;
   const up = p.priceChange.h24 >= 0;
 
+  // Capa social (en modo demo todo queda vacío / mock y no se toca Supabase)
+  const demo = !isSupabaseConfigured;
+  const key = tokenKey(t.chain, t.address);
+  const me = await getMe();
+  const [community, theses, followedWallets] = await Promise.all([
+    getTokenCommunity(key),
+    demo ? Promise.resolve(MOCK_THESES) : getTheses(key),
+    me ? getFollowedWallets(me.id, t.chain) : Promise.resolve([] as string[]),
+  ]);
+  const role = me && community ? await getRole(community.id, me.id) : null;
+
   return (
     <div className="space-y-6">
       {/* Encabezado */}
@@ -98,6 +115,22 @@ export default async function TokenPage({ params, searchParams }: Props) {
           ))}
         </p>
       )}
+
+      {/* CTA principal: comunidad del token */}
+      <section className="flex flex-wrap items-center gap-4 rounded-xl border border-brand/30 bg-brand/5 p-4">
+        <div className="min-w-0 flex-1">
+          <h2 className="font-display text-lg font-semibold">Comunidad de {t.symbol}</h2>
+          <p className="text-sm text-muted">
+            {community
+              ? `${community.member_count} ${community.member_count === 1 ? 'persona' : 'personas'} hablando de este token. Chat en vivo, posts y tesis.`
+              : 'Aún no existe. Crea la comunidad: los tres primeros miembros serán moderadores.'}
+          </p>
+        </div>
+        <JoinCommunityButton
+          chain={t.chain} address={t.address} loggedIn={!!me} communityId={community?.id ?? null}
+          isMember={role !== null} memberCount={community?.member_count ?? 0} goToRoomAfterJoin
+        />
+      </section>
 
       <TokenStats pair={p} totalHolders={t.holders?.totalHolders ?? null} />
 
@@ -131,7 +164,7 @@ export default async function TokenPage({ params, searchParams }: Props) {
         </Section>
 
         <Section title="Holders">
-          <HolderTable stats={t.holders} chain={t.chain} />
+          <HolderTable stats={t.holders} chain={t.chain} social={demo ? undefined : { loggedIn: !!me, followed: followedWallets }} />
         </Section>
       </div>
 
@@ -144,7 +177,7 @@ export default async function TokenPage({ params, searchParams }: Props) {
         </Section>
 
         <Section title="Tesis de la comunidad">
-          <ThesisSection tokenKey={`${t.chain}:${t.address}`} />
+          <ThesisSection chain={t.chain} address={t.address} initial={theses} loggedIn={!!me} demo={demo} />
         </Section>
       </div>
 

@@ -11,7 +11,7 @@ interface Props {
   defaultValue?: string;
 }
 
-/** Busca por contract address (Solana o EVM). La chain se autodetecta en el servidor. */
+/** Busca por contract address (Solana o EVM). La chain se autodetecta en el servidor. Se vacía al enviar. */
 export function SearchBar({ size = 'lg', defaultValue = '' }: Props) {
   const router = useRouter();
   const [value, setValue] = useState(defaultValue);
@@ -26,6 +26,8 @@ export function SearchBar({ size = 'lg', defaultValue = '' }: Props) {
     }
     setError(null);
     router.push(`/token/${v}`);
+    setValue(''); // se borra de inmediato: nadie queda con el contrato pegado en la barra
+    (document.activeElement as HTMLElement | null)?.blur?.();
   }
 
   return (

@@ -1,9 +1,17 @@
 import { AlertTriangle } from 'lucide-react';
 import type { HolderStats } from '@/types/token';
 import { explorerUrl } from '@/lib/chains';
+import { FollowWalletButton } from '@/components/profile/ProfileClient';
 import { cn, shortAddress } from '@/lib/utils';
 
-export function HolderTable({ stats, chain }: { stats: HolderStats | null; chain: string }) {
+interface Props {
+  stats: HolderStats | null;
+  chain: string;
+  /** Si se pasa, cada fila muestra "Seguir" (wallets seguidas del usuario actual). */
+  social?: { loggedIn: boolean; followed: string[] };
+}
+
+export function HolderTable({ stats, chain, social }: Props) {
   if (!stats || stats.top10Pct === null) {
     return (
       <p className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">
@@ -36,7 +44,7 @@ export function HolderTable({ stats, chain }: { stats: HolderStats | null; chain
         <div className="overflow-x-auto rounded-xl border border-line">
           <table className="w-full text-sm">
             <thead className="bg-panel text-left text-muted">
-              <tr><th className="p-2 font-medium">#</th><th className="p-2 font-medium">Wallet</th><th className="p-2 text-right font-medium">% supply</th></tr>
+              <tr><th className="p-2 font-medium">#</th><th className="p-2 font-medium">Wallet</th><th className="p-2 text-right font-medium">% supply</th>{social && <th className="p-2 font-medium"><span className="sr-only">Seguir</span></th>}</tr>
             </thead>
             <tbody>
               {stats.holders.slice(0, 10).map((h, i) => {
@@ -49,6 +57,11 @@ export function HolderTable({ stats, chain }: { stats: HolderStats | null; chain
                       {h.isInsider && <span className="ml-2 rounded bg-rose-500/15 px-1.5 py-0.5 text-xs text-rose-300">insider</span>}
                     </td>
                     <td className="p-2 text-right">{h.pct.toFixed(2)}%</td>
+                    {social && (
+                      <td className="p-2 text-right">
+                        <FollowWalletButton chain={chain} address={h.address} loggedIn={social.loggedIn} initiallyFollowing={social.followed.includes(h.address)} />
+                      </td>
+                    )}
                   </tr>
                 );
               })}

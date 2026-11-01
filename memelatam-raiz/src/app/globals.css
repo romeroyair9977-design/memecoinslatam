@@ -15,3 +15,9 @@ body {
 @media (prefers-reduced-motion: reduce) {
   * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* Ticker superior: se desplaza solo; se pausa al pasar el mouse y respeta "reducir movimiento". */
+@keyframes ml-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.ml-marquee-track { display: flex; width: max-content; animation: ml-marquee 60s linear infinite; }
+.ml-marquee:hover .ml-marquee-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) { .ml-marquee-track { animation: none; } }
