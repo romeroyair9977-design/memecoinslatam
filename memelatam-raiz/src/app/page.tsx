@@ -5,7 +5,7 @@ import { SearchBar } from '@/components/search/SearchBar';
 import { LiveDashboard } from '@/components/dashboard/LiveDashboard';
 import { MOCK_ACTIVITY, MOCK_MESSAGES, MOCK_TOP_COMMUNITIES } from '@/lib/mock';
 import { getDashboard } from '@/lib/services/dashboard';
-import { getActivity, getGeneralCommunity, getMemberCounts, getMessages, getTopCommunities } from '@/lib/services/community';
+import { getActiveBoosts, getActivity, getGeneralCommunity, getMemberCounts, getMessages, getTopCommunities } from '@/lib/services/community';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { formatAge } from '@/lib/utils';
 import { tokenKey } from '@/types/community';
@@ -19,8 +19,9 @@ export default async function HomePage() {
 
   // Todo lo social usa el cliente público (sin cookies) para que la home siga siendo ISR.
   const keys = dash ? dash.tokens.map((t) => tokenKey(t.chain, t.address)) : [];
-  const [memberCounts, general, top, activity] = await Promise.all([
+  const [memberCounts, boosts, general, top, activity] = await Promise.all([
     getMemberCounts(keys),
+    getActiveBoosts(),
     getGeneralCommunity(),
     demo ? Promise.resolve(MOCK_TOP_COMMUNITIES) : getTopCommunities(5),
     demo ? Promise.resolve(MOCK_ACTIVITY) : getActivity(6),
@@ -39,7 +40,7 @@ export default async function HomePage() {
         <div className="mt-6"><SearchBar /></div>
       </section>
 
-      <LiveDashboard initial={dash} memberCounts={demo ? undefined : memberCounts} />
+      <LiveDashboard initial={dash} memberCounts={demo ? undefined : memberCounts} boosts={demo ? undefined : boosts} />
 
       <section id="comunidad" className="scroll-mt-20 grid gap-6 lg:grid-cols-3">
         <div className="space-y-3 lg:col-span-2">

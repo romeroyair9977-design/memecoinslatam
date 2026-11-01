@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Users } from 'lucide-react';
+import { Rocket, Users } from 'lucide-react';
 import type { ColumnId, TokenSummary } from '@/types/token';
 import { badgeFor, PREFERRED_TOP10 } from '@/lib/filters';
 import { chainLabel } from '@/lib/chains';
@@ -23,9 +23,11 @@ interface CardProps {
   column?: ColumnId;
   /** Apareció en el último refresco automático. */
   fresh?: boolean;
+  /** $LATAM en boosts vigentes (0/undefined = sin boost). */
+  boost?: number;
 }
 
-export function TokenCard({ t, members, column, fresh }: CardProps) {
+export function TokenCard({ t, members, column, fresh, boost }: CardProps) {
   const up = t.change24h >= 0;
   const pref = column ? PREFERRED_TOP10[column] : undefined;
   const topOk = t.top10Pct !== null && pref !== undefined ? t.top10Pct <= pref : null;
@@ -34,7 +36,7 @@ export function TokenCard({ t, members, column, fresh }: CardProps) {
       href={`/token/${t.address}?chain=${t.chain}`}
       className={cn(
         'block rounded-xl border bg-panel p-3 transition-colors hover:border-brand/60',
-        fresh ? 'border-brand/70 shadow-[0_0_0_1px_rgba(255,176,46,0.35)]' : 'border-line',
+        fresh || boost ? 'border-brand/70 shadow-[0_0_0_1px_rgba(255,176,46,0.35)]' : 'border-line',
       )}
     >
       <div className="flex items-center gap-3">
@@ -42,6 +44,7 @@ export function TokenCard({ t, members, column, fresh }: CardProps) {
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium">
             {t.symbol} <span className="text-sm font-normal text-muted">{t.name}</span>
+            {boost ? <span title={`${boost} $LATAM en boost`} className="ml-2 inline-flex items-center gap-1 rounded bg-brand/15 px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase text-brand"><Rocket className="h-3 w-3" aria-hidden />Boost</span> : null}
             {fresh && <span className="ml-2 rounded bg-brand px-1.5 py-0.5 align-middle text-[10px] font-semibold uppercase text-bg">Nuevo</span>}
           </p>
           <p suppressHydrationWarning className="text-xs text-muted">{chainLabel(t.chain)} · {formatAge(t.pairCreatedAt)}</p>

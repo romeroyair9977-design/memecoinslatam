@@ -7,7 +7,7 @@ import { getTokenFull } from '@/lib/services/token';
 import { createAdminSupabase, createServerSupabase } from '@/lib/supabase/server';
 import { tokenKey, type Stance } from '@/types/community';
 
-export type ActionResult = { ok: true } | { ok: false; error: string; needsLogin?: boolean };
+export type ActionResult = { ok: true; earned?: number } | { ok: false; error: string; needsLogin?: boolean };
 
 /**
  * Valida el token contra DexScreener (para que nadie invente tokens o metadatos falsos) y lo registra
@@ -81,9 +81,43 @@ export async function postThesis(chain: string, address: string, stance: Stance,
   });
   if (upErr) return { ok: false, error: 'No se pudo registrar el token.' };
 
-  const { error } = await auth.sb.from('theses').insert({ token_key: reg.key, user_id: auth.user.id, stance, body: text });
-  if (error) return { ok: false, error: 'No se pudo publicar la tesis.' };
+  const { data: row, error } = await auth.sb.from('theses').insert({ token_key: reg.key, user_id: auth.user.id, stance, body: text }).select('id').single();
+  if (error || !row) return { ok: false, error: 'No se pudo publicar la tesis.' };
   revalidatePath(`/token/${reg.t.address}`);
   revalidatePath('/actividad');
+  // El trigger de Postgres ya sumó los $LATAM (con tope diario); consultamos cuánto fue para mostrarlo.
+  const { data: tx } = await auth.sb.from('point_transactions').select('amount').eq('ref_id', row.id).eq('reason', 'tesis').maybeSingle();
+  return { ok: true, earned: tx?.amount ?? 0 };
+}
+
+/**
+ * Boost: gasta $LATAM para que el token suba en el dashboard (10 $LATAM = 1 h).
+ * El cobro lo hace la RPC `boost_token` con la sesión del usuario: valida balance y lo descuenta de forma atómica.
+ */
+export async function boostToken(chain: string, address: string, amount: number): Promise<ActionResult> {
+  const auth = await requireUser();
+  if (!auth.ok) return { ok: false, error: auth.error, needsLogin: auth.needsLogin };
+  const reg = await registerToken(chain, address);
+  if (!reg.ok) return { ok: false, error: reg.error };
+
+  const { error: upErr } = await reg.admin.rpc('upsert_token', {
+    p_chain: reg.t.chain, p_address: reg.t.address, p_symbol: reg.t.symbol, p_name: reg.t.name, p_image: reg.t.imageUrl,
+  });
+  if (upErr) return { ok: false, error: 'No se pudo registrar el token.' };
+
+  const { error } = await auth.sb.rpc('boost_token', { p_token_key: reg.key, p_amount: amount });
+  if (error) return { ok: false, error: error.code === 'P0001' ? error.message : 'No se pudo dar el boost.' };
+  revalidatePath('/');
+  revalidatePath(`/token/${reg.t.address}`);
+  return { ok: true };
+}
+
+/** Destaca una tesis propia durante 24 h (20 $LATAM). */
+export async function featureThesis(thesisId: string, address: string): Promise<ActionResult> {
+  const auth = await requireUser();
+  if (!auth.ok) return { ok: false, error: auth.error, needsLogin: auth.needsLogin };
+  const { error } = await auth.sb.rpc('feature_thesis', { p_thesis_id: thesisId });
+  if (error) return { ok: false, error: error.code === 'P0001' ? error.message : 'No se pudo destacar la tesis.' };
+  revalidatePath(`/token/${address}`);
   return { ok: true };
 }

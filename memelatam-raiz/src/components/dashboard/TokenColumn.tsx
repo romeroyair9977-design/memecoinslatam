@@ -12,15 +12,17 @@ interface Props {
   emptyText?: string;
   /** token_key (chain:address) → miembros de su comunidad. Si viene, las cards muestran el contador. */
   memberCounts?: Record<string, number>;
+  /** token_key → $LATAM en boosts vigentes */
+  boosts?: Record<string, number>;
 }
 
-export function TokenColumn({ title, description, tokens, column, freshKeys, emptyText = 'Sin resultados con estos filtros. Se actualiza solo cada 30 s.', memberCounts }: Props) {
+export function TokenColumn({ title, description, tokens, column, freshKeys, emptyText = 'Sin resultados con estos filtros. Se actualiza solo cada 30 s.', memberCounts, boosts }: Props) {
   return (
     <section className="min-w-0">
       <h2 className="font-display text-lg font-semibold">{title} <span className="text-sm font-normal text-muted">({tokens.length})</span></h2>
       <p className="mb-3 text-sm text-muted">{description}</p>
       <div className="space-y-2">
-        {tokens.length ? tokens.map((t) => <TokenCard key={`${t.chain}:${t.address}`} t={t} column={column} fresh={freshKeys?.has(`${t.chain}:${t.address}`)} members={memberCounts ? (memberCounts[tokenKey(t.chain, t.address)] ?? 0) : undefined} />) : (
+        {tokens.length ? tokens.map((t) => <TokenCard key={`${t.chain}:${t.address}`} t={t} column={column} boost={boosts?.[tokenKey(t.chain, t.address)]} fresh={freshKeys?.has(`${t.chain}:${t.address}`)} members={memberCounts ? (memberCounts[tokenKey(t.chain, t.address)] ?? 0) : undefined} />) : (
           <p className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">{emptyText}</p>
         )}
       </div>

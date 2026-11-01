@@ -8,6 +8,8 @@ import { getProfileByUsername } from '@/lib/services/community';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { cn, formatAge, shortAddress } from '@/lib/utils';
+import { formatLatam, LATAM, POINT_REASONS } from '@/lib/latam';
+import type { PointTx } from '@/types/community';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +37,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
 
   let iFollow = false;
   let wallets: { chain: string; address: string; label: string | null }[] = [];
+  let txs: PointTx[] = [];
   if (me && sb) {
     if (!isMe) {
       const { data: f } = await sb.from('follows').select('followed_id').eq('follower_id', me.id).eq('followed_id', profile.id).maybeSingle();
@@ -42,6 +45,8 @@ export default async function ProfilePage({ params }: { params: { username: stri
     } else {
       const { data: w } = await sb.from('wallet_follows').select('chain, address, label').eq('user_id', me.id).order('created_at', { ascending: false });
       wallets = w ?? [];
+      const { data: t } = await sb.from('point_transactions').select('id, amount, reason, created_at').order('created_at', { ascending: false }).limit(15);
+      txs = (t ?? []) as PointTx[];
     }
   }
 
@@ -52,7 +57,7 @@ export default async function ProfilePage({ params }: { params: { username: stri
         <div className="min-w-0 flex-1">
           <h1 className="font-display text-2xl font-bold">@{profile.username}</h1>
           <p className="text-sm text-muted">
-            {followers} {followers === 1 ? 'seguidor' : 'seguidores'} · {following} siguiendo · se unió {formatAge(new Date(profile.created_at).getTime())}
+            <strong className="text-brand">{formatLatam(profile.points_balance ?? 0)}</strong> · {followers} {followers === 1 ? 'seguidor' : 'seguidores'} · {following} siguiendo · se unió {formatAge(new Date(profile.created_at).getTime())}
             {profile.wallet_address && <> · wallet {shortAddress(profile.wallet_address, 4)}</>}
           </p>
           {profile.bio && <p className="mt-1 text-sm">{profile.bio}</p>}
@@ -64,6 +69,25 @@ export default async function ProfilePage({ params }: { params: { username: stri
         <section className="rounded-xl border border-line bg-panel/50 p-4">
           <h2 className="mb-3 font-display text-lg font-semibold">Tu perfil</h2>
           <EditProfile userId={me.id} username={profile.username} bio={profile.bio} />
+        </section>
+      )}
+
+      {isMe && (
+        <section className="rounded-xl border border-line bg-panel/50 p-4">
+          <h2 className="mb-1 font-display text-lg font-semibold">Tu balance de {LATAM.symbol}</h2>
+          <p className="mb-3 text-sm text-muted">Ganas {LATAM.symbol} publicando tesis (+{LATAM.thesis}), creando comunidades (+{LATAM.community}) y recibiendo reacciones (+{LATAM.reaction}). Los gastas en boosts y en destacar tesis.</p>
+          {txs.length === 0 ? (
+            <p className="text-sm text-muted">Todavía no hay movimientos.</p>
+          ) : (
+            <ul className="divide-y divide-line rounded-lg border border-line bg-panel text-sm">
+              {txs.map((x) => (
+                <li key={x.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                  <span>{POINT_REASONS[x.reason] ?? x.reason} <span className="text-xs text-muted">· {formatAge(new Date(x.created_at).getTime())}</span></span>
+                  <span className={cn('font-medium', x.amount > 0 ? 'text-emerald-300' : 'text-rose-300')}>{x.amount > 0 ? '+' : ''}{x.amount}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
 

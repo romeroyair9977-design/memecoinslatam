@@ -12,6 +12,7 @@ import { computeActivity } from '../activity';
 import { getCandidateRefs, getTokensBatch, pickPrimaryPair, type ProfileRef } from './dexscreener';
 import { getNewPoolTokens, getTrendingPoolTokens } from './geckoterminal';
 import { getRugCheckOverview } from './rugcheck';
+import { getBoostedRefs } from './community';
 import type { Dashboard, Pair, TokenSummary } from '@/types/token';
 
 const MAX_CANDIDATES = 150;
@@ -21,6 +22,7 @@ const TOP10_BUDGET_MS = 6_000; // lo que no alcance, se completa en el siguiente
 
 async function gatherCandidates(): Promise<ProfileRef[]> {
   const settled = await Promise.allSettled([
+    getBoostedRefs(), // primero: los tokens con boost de $LATAM siempre entran al dashboard
     getNewPoolTokens('solana'),
     getNewPoolTokens('base'),
     getTrendingPoolTokens('solana'),

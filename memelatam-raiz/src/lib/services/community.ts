@@ -2,7 +2,7 @@ import 'server-only';
 import { MESSAGE_SHAPE_LIMIT } from '@/lib/config';
 import { MESSAGE_SELECT, shapeMessages } from '@/lib/community-shared';
 import { createPublicSupabase, createServerSupabase } from '@/lib/supabase/server';
-import type { ActivityEvent, ChatMessage, Community, Profile, ReactionRow, Role, Thesis } from '@/types/community';
+import type { ActivityEvent, ChatMessage, Community, CommunityPerson, Profile, ReactionRow, Role, Thesis } from '@/types/community';
 
 /**
  * Capa de lectura de la parte social. Todas las funciones devuelven valores vacíos si Supabase no está
@@ -94,7 +94,11 @@ export async function getTheses(key: string, limit = 30): Promise<Thesis[]> {
     .eq('token_key', key)
     .order('created_at', { ascending: false })
     .limit(limit);
-  return (data ?? []).map(({ profiles, ...t }: { profiles: Thesis['author'] } & Record<string, unknown>) => ({ ...t, author: profiles })) as unknown as Thesis[];
+  const list = (data ?? []).map(({ profiles, ...t }: { profiles: Thesis['author'] } & Record<string, unknown>) => ({ ...t, author: profiles })) as unknown as Thesis[];
+  // Las tesis destacadas (con $LATAM) van primero; el resto mantiene el orden por fecha.
+  const now = Date.now();
+  const featured = (t: Thesis) => (t.featured_until && new Date(t.featured_until).getTime() > now ? 1 : 0);
+  return list.sort((a, b) => featured(b) - featured(a));
 }
 
 export async function getActivity(limit = 30, onlyActors?: string[]): Promise<ActivityEvent[]> {
@@ -149,4 +153,39 @@ export async function getProfileByUsername(username: string) {
       tokens: { symbol: string; chain: string; address: string } | null;
     }[],
   };
+}
+
+/** token_key → $LATAM en boosts vigentes (vista `active_boosts`). */
+export async function getActiveBoosts(): Promise<Record<string, number>> {
+  const sb = createPublicSupabase();
+  if (!sb) return {};
+  const { data } = await sb.from('active_boosts').select('token_key, total');
+  return Object.fromEntries((data ?? []).map((b: { token_key: string; total: number }) => [b.token_key, b.total]));
+}
+
+/** Tokens con boost vigente (chain + address), para que el dashboard los incluya aunque no estén en tendencia. */
+export async function getBoostedRefs(): Promise<{ chain: string; address: string }[]> {
+  const sb = createPublicSupabase();
+  if (!sb) return [];
+  const { data: boosts } = await sb.from('active_boosts').select('token_key, total').order('total', { ascending: false }).limit(20);
+  if (!boosts?.length) return [];
+  const { data } = await sb.from('tokens').select('chain, address').in('token_key', boosts.map((b: { token_key: string }) => b.token_key));
+  return (data ?? []) as { chain: string; address: string }[];
+}
+
+/** Gente de la comunidad de un token (para mostrar avatares y botón de seguir). */
+export async function getCommunityPeople(communityId: string, limit = 24): Promise<CommunityPerson[]> {
+  const sb = createPublicSupabase();
+  if (!sb) return [];
+  const { data } = await sb
+    .from('community_members')
+    .select('role, profiles(id, username, avatar_url, wallet_address)')
+    .eq('community_id', communityId)
+    .order('joined_at', { ascending: true })
+    .limit(limit);
+  type Row = { role: CommunityPerson['role']; profiles: Omit<CommunityPerson, 'role'> | Omit<CommunityPerson, 'role'>[] | null };
+  return ((data ?? []) as unknown as Row[]).flatMap((r) => {
+    const p = Array.isArray(r.profiles) ? r.profiles[0] : r.profiles;
+    return p ? [{ ...p, role: r.role }] : [];
+  });
 }

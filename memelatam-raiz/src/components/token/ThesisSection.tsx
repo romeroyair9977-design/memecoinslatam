@@ -3,7 +3,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition, type FormEvent } from 'react';
-import { postThesis } from '@/app/actions/community';
+import { Sparkles } from 'lucide-react';
+import { featureThesis, postThesis } from '@/app/actions/community';
+import { useUser } from '@/components/auth/UserProvider';
+import { LATAM } from '@/lib/latam';
 import { cn, formatAge } from '@/lib/utils';
 import type { Stance, Thesis } from '@/types/community';
 
@@ -28,13 +31,15 @@ export function ThesisSection({ chain, address, initial, loggedIn, demo }: Props
   const [text, setText] = useState('');
   const [stance, setStance] = useState<Stance>('alcista');
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const { user, refresh } = useUser();
   const next = `/token/${address}?chain=${chain}`;
 
   function submit(e: FormEvent) {
     e.preventDefault();
     if (text.trim().length < 5) return setError('Cuéntanos un poco más (mínimo 5 caracteres).');
-    setError(null);
+    setError(null); setNotice(null);
     start(async () => {
       const res = await postThesis(chain, address, stance, text);
       if (!res.ok) {
@@ -42,6 +47,19 @@ export function ThesisSection({ chain, address, initial, loggedIn, demo }: Props
         return setError(res.error);
       }
       setText('');
+      setNotice(res.earned ? `Tesis publicada. Ganaste +${res.earned} ${LATAM.symbol}.` : 'Tesis publicada. (Ya alcanzaste el tope diario de $LATAM por tesis.)');
+      void refresh();
+      router.refresh();
+    });
+  }
+
+  function feature(id: string) {
+    setError(null); setNotice(null);
+    start(async () => {
+      const res = await featureThesis(id, address);
+      if (!res.ok) return setError(res.error);
+      setNotice('Tesis destacada por 24 h.');
+      void refresh();
       router.refresh();
     });
   }
@@ -84,6 +102,8 @@ export function ThesisSection({ chain, address, initial, loggedIn, demo }: Props
           {demo && <p className="text-xs text-muted">Modo demo: conecta Supabase para publicar.</p>}
           {!loggedIn && !demo && <Link href={`/login?next=${encodeURIComponent(next)}`} className="text-sm text-brand hover:underline">Iniciar sesión</Link>}
         </div>
+        {loggedIn && !demo && <p className="text-xs text-muted">Publicar una tesis te da +{LATAM.thesis} {LATAM.symbol}.</p>}
+        {notice && <p role="status" className="text-sm text-emerald-300">{notice}</p>}
         {error && <p role="alert" className="text-sm text-rose-400">{error}</p>}
       </form>
 
@@ -93,14 +113,21 @@ export function ThesisSection({ chain, address, initial, loggedIn, demo }: Props
         <ul className="space-y-2">
           {initial.map((t) => {
             const s = STANCES.find((x) => x.id === t.stance);
+            const featured = !!t.featured_until && new Date(t.featured_until).getTime() > Date.now();
             return (
-              <li key={t.id} className="rounded-lg border border-line bg-panel p-3 text-sm">
-                <p className="mb-1 flex items-center gap-2 text-xs text-muted">
+              <li key={t.id} className={cn('rounded-lg border bg-panel p-3 text-sm', featured ? 'border-brand/50' : 'border-line')}>
+                <p className="mb-1 flex flex-wrap items-center gap-2 text-xs text-muted">
+                  {featured && <span className="inline-flex items-center gap-1 rounded bg-brand/15 px-1.5 py-0.5 font-semibold text-brand"><Sparkles className="h-3 w-3" aria-hidden />Destacada</span>}
                   <span className={cn('font-medium', s?.cls.split(' ')[1])}>{s?.label}</span>
                   {t.author && <Link href={`/perfil/${t.author.username}`} className="hover:text-ink hover:underline">@{t.author.username}</Link>}
                   <time dateTime={t.created_at}>· {formatAge(new Date(t.created_at).getTime())}</time>
                 </p>
                 <p className="whitespace-pre-wrap break-words">{t.body}</p>
+                {user && user.id === t.user_id && (
+                  <button onClick={() => feature(t.id)} disabled={pending || user.points_balance < LATAM.featureThesisCost} className="mt-2 text-xs text-brand hover:underline disabled:opacity-50 disabled:no-underline">
+                    Destacar 24 h · {LATAM.featureThesisCost} {LATAM.symbol}
+                  </button>
+                )}
               </li>
             );
           })}

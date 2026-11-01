@@ -4,7 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshCw, SlidersHorizontal } from 'lucide-react';
 import { DASHBOARD_POLL_MS } from '@/lib/config';
 import { activeFilterCount, buildColumns, COLUMN_META, COLUMN_ORDER, DEFAULT_FILTERS, type DashFilters } from '@/lib/filters';
+import { getBrowserSupabase } from '@/lib/supabase/client';
 import { formatAge } from '@/lib/utils';
+import { tokenKey } from '@/types/community';
 import type { Dashboard } from '@/types/token';
 import { FiltersPanel } from './FiltersPanel';
 import { TokenColumn } from './TokenColumn';
@@ -37,15 +39,18 @@ function loadFilters(): DashFilters {
 interface Props {
   initial: Dashboard | null;
   memberCounts?: Record<string, number>;
+  /** token_key → $LATAM en boosts vigentes (se refresca solo junto con el dashboard). */
+  boosts?: Record<string, number>;
 }
 
-export function LiveDashboard({ initial, memberCounts }: Props) {
+export function LiveDashboard({ initial, memberCounts, boosts: initialBoosts }: Props) {
   const [data, setData] = useState<Dashboard | null>(initial);
   const [filters, setFilters] = useState<DashFilters>(DEFAULT_FILTERS);
   const [panelOpen, setPanelOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [failed, setFailed] = useState(false);
   const [fresh, setFresh] = useState<Set<string>>(new Set());
+  const [boosts, setBoosts] = useState<Record<string, number>>(initialBoosts ?? {});
   // Reloj para la edad de los tokens. Empieza en la hora del servidor (mismo HTML al hidratar) y luego usa la real.
   const [now, setNow] = useState(initial?.updatedAt ?? 0);
   const known = useRef<Set<string>>(new Set((initial?.tokens ?? []).map(keyOf)));
@@ -74,6 +79,12 @@ export function LiveDashboard({ initial, memberCounts }: Props) {
       setData(next);
       setNow(Date.now());
       setFailed(false);
+      // Boosts vigentes (lectura pública de la vista `active_boosts`).
+      const sb = getBrowserSupabase();
+      if (sb) {
+        const { data: b } = await sb.from('active_boosts').select('token_key, total');
+        if (b) setBoosts(Object.fromEntries(b.map((r: { token_key: string; total: number }) => [r.token_key, r.total])));
+      }
     } catch {
       setFailed(true); // se conserva lo último que se vio
     } finally {
@@ -96,10 +107,17 @@ export function LiveDashboard({ initial, memberCounts }: Props) {
     };
   }, [initial, refresh]);
 
-  const columns = useMemo(
-    () => (data ? buildColumns(data.tokens, filters, now) : { nuevas: [], traccion: [], migrando: [] }),
-    [data, filters, now],
-  );
+  // Los tokens con boost suben al inicio de su columna (a más $LATAM, más arriba). sort() es estable: el resto no cambia.
+  const columns = useMemo(() => {
+    if (!data) return { nuevas: [], traccion: [], migrando: [] };
+    const cols = buildColumns(data.tokens, filters, now);
+    const weight = (t: { chain: string; address: string }) => boosts[tokenKey(t.chain, t.address)] ?? 0;
+    return {
+      nuevas: [...cols.nuevas].sort((a, b) => weight(b) - weight(a)),
+      traccion: [...cols.traccion].sort((a, b) => weight(b) - weight(a)),
+      migrando: [...cols.migrando].sort((a, b) => weight(b) - weight(a)),
+    };
+  }, [data, filters, now, boosts]);
 
   const modified =
     (filters.chain !== 'all' ? 1 : 0) +
@@ -151,6 +169,7 @@ export function LiveDashboard({ initial, memberCounts }: Props) {
               tokens={columns[id]}
               freshKeys={fresh}
               memberCounts={memberCounts}
+              boosts={boosts}
             />
           ))}
         </div>

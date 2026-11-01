@@ -18,7 +18,7 @@ ejemplo y la escritura está deshabilitada.
 
 ## Conectar Supabase (10 min)
 1. Crea un proyecto en supabase.com.
-2. **SQL Editor** → pega y ejecuta `supabase/migrations/0001_init.sql`. Crea tablas, RLS, triggers, Realtime,
+2. **SQL Editor** → pega y ejecuta **en orden** `supabase/migrations/0001_init.sql` y luego `0002_latam.sql` ($LATAM, boosts, notificaciones). Crea tablas, RLS, triggers, Realtime,
    el bucket `chat-images` y la **Comunidad General**.
 3. **Project Settings → API**: copia `URL` y `anon key` a `.env.local`, y `service_role key` a
    `SUPABASE_SERVICE_ROLE_KEY` (solo servidor; nunca con prefijo `NEXT_PUBLIC`).
@@ -85,3 +85,22 @@ src/middleware.ts                   refresca la sesión de Supabase
 - Esto no es asesoría financiera. El score de riesgo es heurístico.
 - Deploy en Netlify: `netlify.toml` ya está listo; añade las variables de `.env.example` en el panel.
 - El chat embebido de Discord de la versión anterior se reemplazó por el chat nativo.
+
+## $LATAM, boosts y notificaciones (fase 2)
+Token interno de la plataforma. **El balance nunca lo toca el navegador**: solo triggers y RPCs `security definer` en Postgres.
+
+| Acción | $LATAM | Dónde ocurre |
+|---|---|---|
+| Crear tu cuenta | +20 | trigger `profile_welcome` |
+| Publicar una tesis | +15 (máx. 5 premiadas/día) | trigger `thesis_rewards` |
+| Crear la comunidad de un token | +50 (máx. 3/día) | RPC `join_token_community` |
+| Recibir una reacción | +1 (máx. 30/día, no a ti mismo) | trigger `reaction_rewards` |
+| Boost a un token | −10 por hora (10–500) | RPC `boost_token` |
+| Destacar tu tesis 24 h | −20 | RPC `feature_thesis` |
+
+- Montos y topes: `supabase/migrations/0002_latam.sql` (y `src/lib/latam.ts` para mostrarlos en la UI; mantén ambos iguales).
+- Boosts: la vista `active_boosts` suma los boosts vigentes. El dashboard sube esos tokens al inicio de su columna, los marca con "Boost" y los incluye aunque no estén en tendencia (siguen sujetos a los filtros de la columna).
+- Notificaciones (`notifications`): te siguen, reaccionan a tu mensaje o alguien que sigues publica una tesis. Campana en el header, en vivo por Realtime.
+- Seguir personas: botón en perfiles y en la sección "Gente en {TOKEN}" de cada token. Quien entra con wallet y está en el top de holders sale como "Holder verificado".
+- Login: wallet (Solana/EVM), enlace mágico y correo + contraseña. En **Authentication → Providers → Email** decide si exiges confirmar el correo.
+- Darte $LATAM para probar: `select public.award_points((select id from public.profiles where username='tu_usuario'), 500, 'invitacion', null);`

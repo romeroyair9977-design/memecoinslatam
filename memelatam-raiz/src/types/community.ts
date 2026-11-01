@@ -31,6 +31,7 @@ export interface Profile {
   wallet_address: string | null;
   wallet_chain: string | null;
   is_admin: boolean;
+  points_balance: number;
   created_at: string;
 }
 
@@ -85,6 +86,7 @@ export interface Thesis {
   stance: Stance;
   body: string;
   created_at: string;
+  featured_until?: string | null;
   author: { username: string; avatar_url: string | null } | null;
   token?: Pick<TokenMeta, 'symbol' | 'chain' | 'address'> | null;
 }
@@ -100,3 +102,23 @@ export interface ActivityEvent {
 
 export const tokenKey = (chain: string, address: string) =>
   `${chain}:${address.startsWith('0x') ? address.toLowerCase() : address}`;
+
+/* ───────── $LATAM, notificaciones ───────── */
+export interface PointTx { id: string; amount: number; reason: string; created_at: string }
+
+export interface AppNotification {
+  id: string;
+  type: 'follow' | 'reaction' | 'thesis';
+  actor_id: string | null;
+  payload: { username?: string; emoji?: string; symbol?: string; stance?: Stance; chain?: string; address?: string };
+  read_at: string | null;
+  created_at: string;
+}
+
+export interface CommunityPerson {
+  id: string;
+  username: string;
+  avatar_url: string | null;
+  wallet_address: string | null;
+  role: Role;
+}

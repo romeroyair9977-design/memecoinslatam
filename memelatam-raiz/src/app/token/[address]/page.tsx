@@ -8,11 +8,13 @@ import { HolderTable } from '@/components/token/HolderTable';
 import { NewsFeed } from '@/components/token/NewsFeed';
 import { ThesisSection } from '@/components/token/ThesisSection';
 import { JoinCommunityButton } from '@/components/community/JoinCommunityButton';
+import { CommunityPeople } from '@/components/community/CommunityPeople';
+import { BoostButton } from '@/components/latam/BoostButton';
 import { ActivityBadge, RiskBadge } from '@/components/token/RiskBadge';
 import { getMe } from '@/lib/auth';
 import { chainLabel } from '@/lib/chains';
 import { MOCK_THESES } from '@/lib/mock';
-import { getFollowedWallets, getRole, getTheses, getTokenCommunity } from '@/lib/services/community';
+import { getActiveBoosts, getCommunityPeople, getFollowedWallets, getFollowingIds, getRole, getTheses, getTokenCommunity } from '@/lib/services/community';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { SITE } from '@/lib/config';
 import { getTokenFull } from '@/lib/services/token';
@@ -79,12 +81,15 @@ export default async function TokenPage({ params, searchParams }: Props) {
   const demo = !isSupabaseConfigured;
   const key = tokenKey(t.chain, t.address);
   const me = await getMe();
-  const [community, theses, followedWallets] = await Promise.all([
+  const [community, theses, followedWallets, boosts, followingIds] = await Promise.all([
     getTokenCommunity(key),
     demo ? Promise.resolve(MOCK_THESES) : getTheses(key),
     me ? getFollowedWallets(me.id, t.chain) : Promise.resolve([] as string[]),
+    demo ? Promise.resolve({} as Record<string, number>) : getActiveBoosts(),
+    me ? getFollowingIds(me.id) : Promise.resolve([] as string[]),
   ]);
   const role = me && community ? await getRole(community.id, me.id) : null;
+  const people = community ? await getCommunityPeople(community.id) : [];
 
   return (
     <div className="space-y-6">
@@ -131,6 +136,17 @@ export default async function TokenPage({ params, searchParams }: Props) {
           isMember={role !== null} memberCount={community?.member_count ?? 0} goToRoomAfterJoin
         />
       </section>
+
+      {!demo && (
+        <BoostButton chain={t.chain} address={t.address} symbol={t.symbol} activeTotal={boosts[key] ?? 0} loggedIn={!!me} />
+      )}
+
+      {people.length > 0 && (
+        <CommunityPeople
+          people={people} meId={me?.id ?? null} followingIds={followingIds}
+          holderAddresses={t.holders?.holders.map((h) => h.address) ?? []} chain={t.chain} symbol={t.symbol}
+        />
+      )}
 
       <TokenStats pair={p} totalHolders={t.holders?.totalHolders ?? null} />
 
