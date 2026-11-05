@@ -39,6 +39,7 @@ ejemplo y la escritura está deshabilitada.
 | `/comunidad/[chain]/[address]` | Comunidad del token: Chat y Posts |
 | `/actividad` | Feed en vivo (Todo / Siguiendo) |
 | `/perfil/[usuario]` | Perfil, seguir, wallets seguidas (privadas), tesis |
+| `/tendencias` | Memecoins más mencionadas en X (1h / 6h / 24h), con filtros y enlace al análisis. Requiere `X_BEARER_TOKEN` |
 | `/ranking` | 4 rankings de memecoins: más sonadas, nuevas con FOMO, más volumen, clásicas (se renueva cada hora) |
 | `/predicciones` | Apuesta cuánto va a perdurar una memecoin; ranking de los que más aciertan por categoría |
 | `/wallets` | Wallets que aparecen en varias memecoins calientes, más guardadas, y tus wallets (agrega las tuyas) |

@@ -5,6 +5,7 @@ import { UserMenu } from '@/components/auth/UserMenu';
 
 const NAV = [
   { href: '/#dashboard', label: 'Dashboard' },
+  { href: '/tendencias', label: 'Tendencias X' },
   { href: '/ranking', label: 'Ranking' },
   { href: '/predicciones', label: 'Predicciones' },
   { href: '/wallets', label: 'Wallets' },
