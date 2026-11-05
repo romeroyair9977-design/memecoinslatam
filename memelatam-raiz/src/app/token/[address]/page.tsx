@@ -6,6 +6,8 @@ import { SearchBar } from '@/components/search/SearchBar';
 import { TokenAvatar } from '@/components/token/TokenCard';
 import { TokenStats } from '@/components/token/TokenStats';
 import { HolderTable } from '@/components/token/HolderTable';
+import { ContractChip } from '@/components/token/ContractChip';
+import { PriceChart } from '@/components/token/PriceChart';
 import { NewsFeed } from '@/components/token/NewsFeed';
 import { ThesisSection } from '@/components/token/ThesisSection';
 import { JoinCommunityButton } from '@/components/community/JoinCommunityButton';
@@ -106,6 +108,7 @@ export default async function TokenPage({ params, searchParams }: Props) {
             <RiskBadge level={t.risk.level} score={t.risk.score} />
             <ActivityBadge status={t.activity.status} />
           </div>
+          <ContractChip chain={t.chain} address={t.address} />
         </div>
         <div className="text-right">
           <p className="text-2xl font-semibold">{formatPrice(p.priceUsd)}</p>
@@ -158,15 +161,16 @@ export default async function TokenPage({ params, searchParams }: Props) {
 
       <TokenStats pair={p} totalHolders={t.holders?.totalHolders ?? null} />
 
-      {/* Gráfico: embed oficial de DexScreener */}
-      <div className="overflow-hidden rounded-xl border border-line">
-        <iframe
-          title={`Gráfico de ${t.symbol}`}
-          src={`https://dexscreener.com/${p.chainId}/${p.pairAddress}?embed=1&theme=dark&trades=0&info=0`}
-          className="h-[420px] w-full bg-panel"
-          loading="lazy"
-        />
-      </div>
+      {/* Gráfico propio: velas + compras/ventas reales del pool dibujadas como burbujas */}
+      <PriceChart
+        chain={t.chain}
+        pool={p.pairAddress}
+        token={t.address}
+        symbol={t.symbol}
+        holderAddresses={t.holders?.holders.map((h) => h.address) ?? []}
+        totalHolders={t.holders?.totalHolders ?? null}
+        advancedSrc={`https://dexscreener.com/${p.chainId}/${p.pairAddress}?embed=1&theme=dark&trades=0&info=0`}
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title="Riesgo y señales">
