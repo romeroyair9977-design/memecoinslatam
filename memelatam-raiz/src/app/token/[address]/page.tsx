@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, Info, ShieldAlert } from 'lucide-react';
+import { AdSlot } from '@/components/ads/AdSlot';
 import { SearchBar } from '@/components/search/SearchBar';
 import { TokenAvatar } from '@/components/token/TokenCard';
 import { TokenStats } from '@/components/token/TokenStats';
@@ -136,6 +137,13 @@ export default async function TokenPage({ params, searchParams }: Props) {
           isMember={role !== null} memberCount={community?.member_count ?? 0} goToRoomAfterJoin
         />
       </section>
+
+      <p className="text-sm text-muted">
+        ¿Crees que {t.symbol} va a durar? <Link href={`/predicciones?token=${t.address}&chain=${t.chain}`} className="text-brand hover:underline">Haz tu predicción y gana $LATAM si aciertas →</Link>
+      </p>
+
+      {/* Anuncio: justo después de la acción principal y antes del análisis largo; no interrumpe ningún dato. */}
+      <AdSlot slot="token" minHeight={120} />
 
       {!demo && (
         <BoostButton chain={t.chain} address={t.address} symbol={t.symbol} activeTotal={boosts[key] ?? 0} loggedIn={!!me} />

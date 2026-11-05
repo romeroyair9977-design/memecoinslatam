@@ -12,7 +12,7 @@ import { FiltersPanel } from './FiltersPanel';
 import { TokenColumn } from './TokenColumn';
 import { TrendingStrip } from './TrendingStrip';
 
-const STORAGE_KEY = 'memelatam:filters:v1';
+const STORAGE_KEY = 'veltrix:filters:v1';
 const FRESH_MS = 45_000; // cuánto tiempo se resalta una memecoin recién aparecida
 
 const keyOf = (t: { chain: string; address: string }) => `${t.chain}:${t.address}`;
@@ -66,6 +66,11 @@ export function LiveDashboard({ initial, memberCounts, boosts: initialBoosts }: 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
+      // Dashboard y boosts en paralelo (antes uno esperaba al otro).
+      const sb = getBrowserSupabase();
+      const boostsReq = sb
+        ? Promise.resolve(sb.from('active_boosts').select('token_key, total')).then((r) => r.data, () => null)
+        : Promise.resolve(null);
       const res = await fetch('/api/dashboard', { cache: 'no-store' });
       if (!res.ok) throw new Error(String(res.status));
       const next = (await res.json()) as Dashboard;
@@ -79,12 +84,8 @@ export function LiveDashboard({ initial, memberCounts, boosts: initialBoosts }: 
       setData(next);
       setNow(Date.now());
       setFailed(false);
-      // Boosts vigentes (lectura pública de la vista `active_boosts`).
-      const sb = getBrowserSupabase();
-      if (sb) {
-        const { data: b } = await sb.from('active_boosts').select('token_key, total');
-        if (b) setBoosts(Object.fromEntries(b.map((r: { token_key: string; total: number }) => [r.token_key, r.total])));
-      }
+      const b = (await boostsReq) as { token_key: string; total: number }[] | null;
+      if (b) setBoosts(Object.fromEntries(b.map((r) => [r.token_key, r.total])));
     } catch {
       setFailed(true); // se conserva lo último que se vio
     } finally {
@@ -92,7 +93,7 @@ export function LiveDashboard({ initial, memberCounts, boosts: initialBoosts }: 
     }
   }, []);
 
-  // Auto-actualización: cada 30 s mientras la pestaña esté visible, y al volver a ella.
+  // Auto-actualización: cada 20 s mientras la pestaña esté visible, y al volver a ella.
   useEffect(() => {
     if (!initial) void refresh(); // la carga inicial falló en el servidor: reintenta ya
     const poll = setInterval(() => { if (!document.hidden) void refresh(); }, DASHBOARD_POLL_MS);
@@ -155,7 +156,7 @@ export function LiveDashboard({ initial, memberCounts, boosts: initialBoosts }: 
 
         {!data && !loading && failed && (
           <p role="alert" className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
-            No pudimos cargar el dashboard (las APIs de datos no respondieron). Reintentamos solos cada 30 s.
+            No pudimos cargar el dashboard (las APIs de datos no respondieron). Reintentamos solos cada 20 s.
           </p>
         )}
 
@@ -176,7 +177,7 @@ export function LiveDashboard({ initial, memberCounts, boosts: initialBoosts }: 
         <p className="mt-3 text-xs text-muted">Clasificación heurística con datos de DexScreener, GeckoTerminal y RugCheck. No es asesoría financiera.</p>
       </section>
 
-      {panelOpen && <FiltersPanel filters={filters} onChange={updateFilters} onClose={() => setPanelOpen(false)} />}
+      {panelOpen && <FiltersPanel filters={filters} tokens={data?.tokens ?? []} onApply={updateFilters} onClose={() => setPanelOpen(false)} />}
     </div>
   );
 }

@@ -16,7 +16,7 @@ interface Props {
   boosts?: Record<string, number>;
 }
 
-export function TokenColumn({ title, description, tokens, column, freshKeys, emptyText = 'Sin resultados con estos filtros. Se actualiza solo cada 30 s.', memberCounts, boosts }: Props) {
+export function TokenColumn({ title, description, tokens, column, freshKeys, emptyText = 'Sin resultados con estos filtros. Se actualiza solo cada 20 s.', memberCounts, boosts }: Props) {
   return (
     <section className="min-w-0">
       <h2 className="font-display text-lg font-semibold">{title} <span className="text-sm font-normal text-muted">({tokens.length})</span></h2>

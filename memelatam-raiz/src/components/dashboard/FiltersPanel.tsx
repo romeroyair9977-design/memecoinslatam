@@ -1,15 +1,19 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import { CHAINS } from '@/lib/chains';
-import { COLUMN_META, COLUMN_ORDER, DEFAULT_FILTERS, type ColumnFilters, type DashFilters } from '@/lib/filters';
+import { buildColumns, COLUMN_META, COLUMN_ORDER, DEFAULT_FILTERS, type ColumnFilters, type DashFilters } from '@/lib/filters';
 import { cn } from '@/lib/utils';
-import type { ColumnId } from '@/types/token';
+import type { ColumnId, TokenSummary } from '@/types/token';
 
 interface Props {
+  /** Filtros ya aplicados al dashboard */
   filters: DashFilters;
-  onChange: (f: DashFilters) => void;
+  /** Tokens disponibles: sirven para mostrar cuántos resultados daría el borrador antes de aplicarlo. */
+  tokens: TokenSummary[];
+  /** Se llama SOLO al pulsar "Buscar" (aplica y guarda). */
+  onApply: (f: DashFilters) => void;
   onClose: () => void;
 }
 
@@ -44,9 +48,21 @@ function NumInput({ value, onChange, placeholder, label }: { value: number | nul
   );
 }
 
-export function FiltersPanel({ filters, onChange, onClose }: Props) {
+export function FiltersPanel({ filters: applied, tokens, onApply, onClose }: Props) {
+  // Borrador: se edita aquí y solo se aplica al pulsar "Buscar" (antes cada tecla cambiaba el dashboard sin avisar y
+  // parecía que el botón no hacía nada).
+  const [filters, setDraft] = useState<DashFilters>(applied);
   const [tab, setTab] = useState<ColumnId>('nuevas');
   const col = filters.columns[tab];
+  const onChange = setDraft;
+
+  // Resultados que daría el borrador (misma lógica que el dashboard, en el navegador y al instante).
+  const counts = useMemo(() => {
+    const c = buildColumns(tokens, filters);
+    return { nuevas: c.nuevas.length, traccion: c.traccion.length, migrando: c.migrando.length };
+  }, [tokens, filters]);
+  const total = counts.nuevas + counts.traccion + counts.migrando;
+  const dirty = JSON.stringify(filters) !== JSON.stringify(applied);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -64,7 +80,7 @@ export function FiltersPanel({ filters, onChange, onClose }: Props) {
         aria-modal="true"
         aria-label="Filtros avanzados"
         onClick={(e) => e.stopPropagation()}
-        className="flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-line bg-panel p-5"
+        className="flex h-full w-full max-w-md flex-col overflow-y-auto border-l border-line bg-panel p-5 pb-0"
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="font-display text-lg font-semibold">Filtros avanzados</h2>
@@ -94,7 +110,7 @@ export function FiltersPanel({ filters, onChange, onClose }: Props) {
               onClick={() => setTab(id)}
               className={cn('rounded-md px-2 py-1.5 text-xs font-medium', tab === id ? 'bg-brand text-bg' : 'text-muted hover:text-ink')}
             >
-              {COLUMN_META[id].title}
+              {COLUMN_META[id].title} <span className="opacity-70">({counts[id]})</span>
             </button>
           ))}
         </div>
@@ -121,16 +137,28 @@ export function FiltersPanel({ filters, onChange, onClose }: Props) {
         </div>
         <p className="mt-3 text-xs text-muted">Top 10 desconocido (aún sin consultar o fuera de Solana) no se excluye.</p>
 
-        <div className="mt-auto flex gap-2 pt-6">
+        {/* Barra fija abajo: siempre visible, sin tener que bajar el scroll para encontrar el botón. */}
+        <div className="sticky -bottom-5 -mx-5 mt-auto space-y-2 border-t border-line bg-panel px-5 pb-5 pt-4">
           <button
-            onClick={() => onChange({ ...filters, columns: { ...filters.columns, [tab]: DEFAULT_FILTERS.columns[tab] } })}
-            className="flex-1 rounded-lg border border-line px-3 py-2 text-sm hover:border-brand/60"
+            onClick={() => { onApply(filters); onClose(); }}
+            className="w-full rounded-lg bg-brand px-4 py-3 text-sm font-semibold text-bg hover:bg-brand-dim"
           >
-            Restablecer esta columna
+            Buscar · {total} {total === 1 ? 'resultado' : 'resultados'}{dirty ? '' : ' (sin cambios)'}
           </button>
-          <button onClick={() => onChange(DEFAULT_FILTERS)} className="flex-1 rounded-lg border border-line px-3 py-2 text-sm hover:border-brand/60">
-            Restablecer todo
-          </button>
+          {total === 0 && (
+            <p className="text-xs text-amber-300">Con estos filtros no sale ninguna memecoin ahora mismo. Afloja algún límite (liquidez, market cap o edad).</p>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={() => onChange({ ...filters, columns: { ...filters.columns, [tab]: DEFAULT_FILTERS.columns[tab] } })}
+              className="flex-1 rounded-lg border border-line px-3 py-2 text-sm hover:border-brand/60"
+            >
+              Restablecer esta columna
+            </button>
+            <button onClick={() => onChange(DEFAULT_FILTERS)} className="flex-1 rounded-lg border border-line px-3 py-2 text-sm hover:border-brand/60">
+              Restablecer todo
+            </button>
+          </div>
         </div>
       </aside>
     </div>

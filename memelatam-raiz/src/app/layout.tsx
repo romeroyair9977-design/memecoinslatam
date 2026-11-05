@@ -3,7 +3,8 @@ import { Bricolage_Grotesque, DM_Sans } from 'next/font/google';
 import { UserProvider } from '@/components/auth/UserProvider';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
-import { SITE } from '@/lib/config';
+import Script from 'next/script';
+import { ADS, SITE } from '@/lib/config';
 import './globals.css';
 
 const display = Bricolage_Grotesque({ subsets: ['latin'], variable: '--font-display', display: 'swap' });
@@ -11,6 +12,9 @@ const body = DM_Sans({ subsets: ['latin'], variable: '--font-body', display: 'sw
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
+  alternates: { canonical: '/' },
+  // Google AdSense verifica la propiedad del sitio con esta etiqueta (además de ads.txt).
+  other: { 'google-adsense-account': ADS.client },
   title: { default: `${SITE.name} · ${SITE.tagline}`, template: `%s · ${SITE.name}` },
   description: SITE.description,
   openGraph: { type: 'website', locale: 'es_LA', siteName: SITE.name, title: SITE.name, description: SITE.description },
@@ -23,6 +27,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="es" className={`${display.variable} ${body.variable}`}>
       <body className="flex min-h-screen flex-col">
+        {/* AdSense: una sola carga para todo el sitio. afterInteractive = no frena el primer render. */}
+        <Script
+          id="adsense"
+          async
+          strategy="afterInteractive"
+          src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADS.client}`}
+          crossOrigin="anonymous"
+        />
         <UserProvider>
           <Header />
           <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">{children}</main>

@@ -104,7 +104,7 @@ export async function getTokenByAddress(address: string): Promise<Pair[]> {
 export async function getTokensBatch(chain: string, addresses: string[]): Promise<Pair[]> {
   if (!addresses.length) return [];
   const list = addresses.slice(0, 30).join(',');
-  const raw = await fetchJson<RawPair[]>(`${BASE}/tokens/v1/${chain}/${list}`, { revalidate: 30 });
+  const raw = await fetchJson<RawPair[]>(`${BASE}/tokens/v1/${chain}/${list}`, { revalidate: 15, timeoutMs: 5_000 });
   return (Array.isArray(raw) ? raw : []).map(normalizePair);
 }
 
@@ -126,7 +126,7 @@ export async function getCandidateRefs(): Promise<ProfileRef[]> {
     `${BASE}/token-boosts/latest/v1`,
     `${BASE}/token-boosts/top/v1`,
   ];
-  const results = await Promise.allSettled(urls.map((u) => fetchJson<RawProfile[]>(u, { revalidate: 60 })));
+  const results = await Promise.allSettled(urls.map((u) => fetchJson<RawProfile[]>(u, { revalidate: 60, timeoutMs: 4_000 })));
   const refs: ProfileRef[] = [];
   for (const r of results) {
     if (r.status !== 'fulfilled' || !Array.isArray(r.value)) continue;

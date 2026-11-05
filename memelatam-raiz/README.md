@@ -1,4 +1,4 @@
-# MemeLatam (MVP)
+# Veltrix Coin (MVP) · por Veltrix Colombia
 
 Plataforma en español para la comunidad latina de memecoins: buscador por contract address, análisis de
 holders y riesgo, dashboard (Recién lanzadas / Con tracción / Migrando), **comunidades en tiempo real**
@@ -32,14 +32,18 @@ ejemplo y la escritura está deshabilitada.
 ## Rutas
 | Ruta | Qué es |
 |---|---|
-| `/` | Ticker + dashboard de 3 columnas que se actualiza solo cada 30 s + filtros avanzados + comunidad y actividad |
-| `/api/dashboard` | JSON con todos los tokens enriquecidos (cache 30 s). Lo consulta el navegador para refrescar |
+| `/` | Ticker + dashboard de 3 columnas que se actualiza solo cada 20 s + filtros avanzados + comunidad y actividad |
+| `/api/dashboard` | JSON con todos los tokens enriquecidos (cache 20 s + stale-while-revalidate). Lo consulta el navegador para refrescar |
 | `/token/[address]?chain=` | Análisis: mercado, holders, riesgo, tesis, botón de comunidad |
 | `/comunidad` | Comunidad General: canales General · Señales · Rugs · Nuevas |
 | `/comunidad/[chain]/[address]` | Comunidad del token: Chat y Posts |
 | `/actividad` | Feed en vivo (Todo / Siguiendo) |
 | `/perfil/[usuario]` | Perfil, seguir, wallets seguidas (privadas), tesis |
-| `/login` | Wallet (Solana / EVM) o enlace por correo |
+| `/ranking` | 4 rankings de memecoins: más sonadas, nuevas con FOMO, más volumen, clásicas (se renueva cada hora) |
+| `/predicciones` | Apuesta cuánto va a perdurar una memecoin; ranking de los que más aciertan por categoría |
+| `/wallets` | Wallets que aparecen en varias memecoins calientes, más guardadas, y tus wallets (agrega las tuyas) |
+| `/privacidad` | Política de privacidad y publicidad (la pide AdSense) |
+| `/login` | Google, código al correo, contraseña o wallet (Solana / EVM) |
 | `/admin/reportes` | Cola de moderación (admins y mods) |
 
 ## Dashboard y filtros
@@ -50,7 +54,7 @@ ejemplo y la escritura está deshabilitada.
   <30 % migrando) y se puede volver filtro duro desde el panel. Si el dato no existe, el token no se excluye.
 - El servidor devuelve todos los tokens y el **navegador** los reparte en columnas; por eso el panel responde
   al instante. Los filtros del usuario se guardan en `localStorage`.
-- Las memecoins nuevas entran solas: el cliente consulta `/api/dashboard` cada 30 s (pausa con la pestaña oculta)
+- Las memecoins nuevas entran solas: el cliente consulta `/api/dashboard` cada 20 s (pausa con la pestaña oculta)
   y marca con “Nuevo” las que aparecen.
 - La barra de búsqueda se vacía al enviar.
 
@@ -104,3 +108,63 @@ Token interno de la plataforma. **El balance nunca lo toca el navegador**: solo 
 - Seguir personas: botón en perfiles y en la sección "Gente en {TOKEN}" de cada token. Quien entra con wallet y está en el top de holders sale como "Holder verificado".
 - Login: wallet (Solana/EVM), enlace mágico y correo + contraseña. En **Authentication → Providers → Email** decide si exiges confirmar el correo.
 - Darte $LATAM para probar: `select public.award_points((select id from public.profiles where username='tu_usuario'), 500, 'invitacion', null);`
+
+
+## Fase 3 (esta versión)
+
+### Dominio y marca
+- Marca madre: **Veltrix Colombia** (`veltrixcolombia.com`). Esta plataforma: **Veltrix Coin**, pensada como subdominio
+  (`memecoin.veltrixcolombia.com`). Todo sale de `src/lib/config.ts` y de dos variables: `NEXT_PUBLIC_SITE_URL`
+  y `NEXT_PUBLIC_PARENT_URL`. **Si cambias de dominio solo cambias esas variables en el hosting** y vuelves a desplegar
+  (y en Supabase actualizas Site URL y Redirect URLs).
+- Subdominio: en el DNS de `veltrixcolombia.com` crea un `CNAME` `memecoin` → el host que te dé tu hosting.
+
+### Anuncios (Google AdSense)
+- El script de AdSense se carga **una sola vez** en `src/app/layout.tsx` (con `next/script`, después de que la página ya es
+  interactiva, así no frena nada). `public/ads.txt` ya tiene tu publisher ID.
+- Espacios (`<AdSlot slot="..."/>`): `home` (entre el dashboard y la comunidad), `sidebar` (lateral de la home),
+  `token` (página del token, después de la acción principal), `ranking` (ranking, predicciones y wallets, entre secciones).
+  Nunca tapan botones, tarjetas ni el chat y reservan su alto para no mover el contenido.
+- **Falta un paso tuyo:** en AdSense crea 4 bloques de anuncio (Anuncios → Por unidad de anuncio → Display adaptable) y pon sus
+  IDs en `NEXT_PUBLIC_AD_SLOT_HOME`, `_SIDEBAR`, `_TOKEN`, `_RANKING`. Sin ID, ese espacio no se muestra. También puedes activar
+  "Anuncios automáticos" en el panel de AdSense.
+- AdSense exige política de privacidad: ya está en `/privacidad` y enlazada en el pie.
+
+### Velocidad en tiempo real
+- Cache con *stale-while-revalidate* (`lib/cache.ts`): el usuario recibe al instante el último dato y se recalcula en segundo plano.
+- Las fuentes externas tienen tiempo límite individual: una API lenta ya no frena a las demás.
+- RugCheck (lo más lento) ya no bloquea la respuesta: el top 10 se completa solo en los refrescos siguientes.
+- El navegador pide dashboard y boosts en paralelo y refresca cada 20 s.
+- Más candidatos: pools con más volumen de Solana y Base (si no, "Migrando" casi nunca tenía datos con filtros altos).
+
+### Filtros
+- El panel ahora edita un borrador y tiene el botón **Buscar · N resultados** (fijo abajo). Muestra cuántos resultados da cada columna
+  antes de aplicar y avisa si no sale ninguno.
+
+### Login
+- **Google**, **código al correo** (recomendado: sin contraseña), contraseña y wallet. Configuración en Supabase:
+  1. *Authentication → Providers → Google*: activa y pega el Client ID/Secret de Google Cloud (OAuth, tipo "Web"). En Google Cloud
+     añade como redirect URI la que te muestra Supabase (`https://<proyecto>.supabase.co/auth/v1/callback`).
+  2. *Authentication → Email Templates → Magic Link* (y *Confirm signup*): incluye `{{ .Token }}` en el cuerpo para que llegue el código,
+     por ejemplo: `Tu código de Veltrix Coin: {{ .Token }}`.
+  3. *Authentication → Providers → Email → Email OTP Length*: 6 (o el número que prefieras; la app acepta de 6 a 10).
+  4. **Correo propio (SMTP):** el correo integrado de Supabase está limitado a unas pocas por hora y es solo para pruebas.
+     Antes de lanzar configura SMTP propio (Resend, Brevo, Gmail SMTP…) en *Project Settings → Authentication → SMTP*.
+
+### Recompensas $LATAM (más bajas)
+Migración `0003_predicciones.sql`: bienvenida **5** (antes 20), tesis **3** (3/día), comunidad **10** (2/día), reacción **1** (10/día).
+
+### Predicciones y ranking de aciertos
+- Migración `supabase/migrations/0003_predicciones.sql` (ejecútala después de 0001 y 0002).
+- Predices que una memecoin seguirá **viva** (o **muerta**) en 1 semana / 1 mes / 3 meses / 6 meses, por categoría (general, IA, animales,
+  celebridades). Premio al acertar: 2 / 6 / 15 / 30 $LATAM (apostar a que muere paga la mitad). Máx. 5 por día, una por token, solo
+  tokens con ≥ $10K de liquidez. "Viva" = liquidez ≥ $5K y volumen 24 h ≥ $1K al vencer.
+- Se resuelven solas al abrir `/predicciones`; opcional: un cron diario a `GET /api/cron/predicciones` con `Authorization: Bearer $CRON_SECRET`.
+- Los montos/umbrales viven en el SQL y en `src/lib/predictions.ts` (mantén ambos iguales).
+
+### Wallets
+- `/wallets`: "Wallets en movimiento" = wallets de Solana entre los mayores holders de **varias** memecoins calientes (sin pools). Guardar con un
+  clic y agregar cualquier wallet a mano. **No se muestran ganancias**: no hay una fuente gratuita y verificable de PnL; mostrar "mejores traders"
+  inventados sería engañar al usuario.
+- Cambio importante: la lista de holders ahora usa la wallet dueña (`owner` de RugCheck) y no la cuenta de token, para que lo que se guarda sea
+  una wallet real.

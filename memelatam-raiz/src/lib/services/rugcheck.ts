@@ -41,7 +41,8 @@ export async function getRugCheckOverview(mint: string): Promise<RugCheckOvervie
       const holders = (r.topHolders ?? [])
         .filter((h) => !poolAccounts.has(h.address) && !(h.owner && poolAccounts.has(h.owner)))
         .map((h) => ({
-        address: h.address,
+        // `address` de RugCheck es la cuenta de token (ATA); la wallet real que se puede seguir es `owner`.
+        address: h.owner ?? h.address,
         pct: h.pct, // RugCheck devuelve porcentaje (p.ej. 12.3 = 12.3%)
         amount: h.amount,
         isInsider: h.insider,
