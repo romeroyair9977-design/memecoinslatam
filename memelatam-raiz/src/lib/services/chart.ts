@@ -11,6 +11,7 @@ const BASE = 'https://api.geckoterminal.com/api/v2';
 const HEADERS = { accept: 'application/json;version=20230302' };
 
 export const TIMEFRAMES = {
+  '1m': { path: 'minute', aggregate: 1 },
   '5m': { path: 'minute', aggregate: 5 },
   '15m': { path: 'minute', aggregate: 15 },
   '1h': { path: 'hour', aggregate: 1 },

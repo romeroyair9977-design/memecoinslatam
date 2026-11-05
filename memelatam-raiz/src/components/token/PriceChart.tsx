@@ -6,9 +6,9 @@ import { explorerUrl } from '@/lib/chains';
 import { cn, formatNumber, formatPrice, formatUsd, shortAddress } from '@/lib/utils';
 import type { Candle, ChartTrade } from '@/lib/services/chart';
 
-type TF = '5m' | '15m' | '1h' | '4h' | '1d';
-const TFS: TF[] = ['5m', '15m', '1h', '4h', '1d'];
-const TF_SECONDS: Record<TF, number> = { '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
+type TF = '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
+const TFS: TF[] = ['1m', '5m', '15m', '1h', '4h', '1d'];
+const TF_SECONDS: Record<TF, number> = { '1m': 60, '5m': 300, '15m': 900, '1h': 3600, '4h': 14400, '1d': 86400 };
 
 interface Payload { candles: Candle[]; trades: ChartTrade[] }
 
@@ -47,10 +47,10 @@ function fmtTime(t: number, tf: TF) {
 }
 
 export function PriceChart({ chain, pool, token, symbol, holderAddresses, totalHolders, advancedSrc }: Props) {
-  const [tf, setTf] = useState<TF>('15m');
+  const [tf, setTf] = useState<TF>('1m');
   const [data, setData] = useState<Payload | null>(null);
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading');
-  const [mode, setMode] = useState<'veltrix' | 'avanzado'>('veltrix');
+  const [mode, setMode] = useState<'veltrix' | 'avanzado'>('avanzado');
   const [showWallets, setShowWallets] = useState(true);
   const [hover, setHover] = useState<number | null>(null);
   const [tip, setTip] = useState<number | null>(null);
@@ -144,7 +144,7 @@ export function PriceChart({ chain, pool, token, symbol, holderAddresses, totalH
       {/* Barra superior */}
       <div className="flex flex-wrap items-center gap-2 border-b border-line p-2 text-xs">
         <div className="flex gap-1" role="tablist" aria-label="Tipo de gráfico">
-          {([['veltrix', 'Gráfico'], ['avanzado', 'Avanzado']] as const).map(([id, label]) => (
+          {([['avanzado', 'TradingView'], ['veltrix', 'Wallets']] as const).map(([id, label]) => (
             <button key={id} role="tab" aria-selected={mode === id} onClick={() => setMode(id)}
               className={cn('rounded-md px-2.5 py-1', mode === id ? 'bg-panel2 text-ink' : 'text-muted hover:text-ink')}>{label}</button>
           ))}
@@ -166,13 +166,13 @@ export function PriceChart({ chain, pool, token, symbol, holderAddresses, totalH
       </div>
 
       {mode === 'avanzado' && (
-        <iframe title={`Gráfico avanzado de ${symbol}`} src={advancedSrc} className="h-[420px] w-full bg-panel" loading="lazy" />
+        <iframe title={`Gráfico avanzado de ${symbol}`} src={advancedSrc} className="h-[560px] w-full bg-panel" loading="lazy" />
       )}
 
       {mode === 'veltrix' && status === 'error' && !data && (
         <div className="space-y-3 p-6 text-center text-sm text-muted">
           <p>No pudimos cargar el gráfico de {symbol} (el pool puede ser muy nuevo o la fuente está ocupada).</p>
-          <button onClick={() => setMode('avanzado')} className="rounded-lg border border-line px-3 py-1.5 text-ink hover:border-brand/60">Probar el gráfico avanzado</button>
+          <button onClick={() => setMode('avanzado')} className="rounded-lg border border-line px-3 py-1.5 text-ink hover:border-brand/60">Ver el gráfico de TradingView</button>
         </div>
       )}
 

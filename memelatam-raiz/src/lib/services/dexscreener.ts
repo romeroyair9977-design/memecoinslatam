@@ -134,3 +134,12 @@ export async function getCandidateRefs(): Promise<ProfileRef[]> {
   }
   return refs;
 }
+
+/** Par "en vivo" para refrescar precio y cifras en pantalla: cache de 4 s y sin la caché larga de Next. */
+export async function getLivePair(chain: string, token: string, pool: string): Promise<Pair | null> {
+  return cached(`dex:live:${chain}:${cacheSafeAddress(token)}:${pool}`, 4_000, async () => {
+    const raw = await fetchJson<RawPair[]>(`${BASE}/tokens/v1/${chain}/${token}`, { revalidate: 3, timeoutMs: 5_000 });
+    const pairs = (Array.isArray(raw) ? raw : []).map(normalizePair);
+    return pairs.find((p) => p.pairAddress.toLowerCase() === pool.toLowerCase()) ?? pickPrimaryPair(pairs);
+  });
+}
