@@ -10,6 +10,7 @@ import { LiveTokenProvider } from '@/components/token/LiveTokenProvider';
 import { PredictionBox } from '@/components/token/PredictionBox';
 import { TopTraders } from '@/components/token/TopTraders';
 import { HolderTable } from '@/components/token/HolderTable';
+import { WhaleSummary } from '@/components/token/WhaleSummary';
 import { NewsFeed } from '@/components/token/NewsFeed';
 import { ThesisSection } from '@/components/token/ThesisSection';
 import { JoinCommunityButton } from '@/components/community/JoinCommunityButton';
@@ -182,7 +183,8 @@ export default async function TokenPage({ params, searchParams }: Props) {
           <p className="mt-4 text-xs text-muted">Un riesgo bajo no significa que sea seguro. Es una heurística, no una garantía.</p>
         </Section>
 
-        <Section title="Holders">
+        <Section title="Holders y ballenas">
+          <WhaleSummary stats={t.holders} />
           <HolderTable stats={t.holders} chain={t.chain} social={demo ? undefined : { loggedIn: !!me, followed: followedWallets }} />
         </Section>
       </div>
