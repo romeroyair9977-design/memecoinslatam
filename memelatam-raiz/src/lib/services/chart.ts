@@ -1,102 +1,72 @@
-/**
- * Datos del gráfico propio (velas + compras/ventas reales del pool) desde GeckoTerminal (API pública, sin key).
- * Así dibujamos el gráfico nosotros en vez de incrustar el de otro sitio.
- */
+/** Velas OHLCV y trades recientes de un pool (GeckoTerminal, sin key, ~30 req/min). */
 import { cached } from '../cache';
-import { cacheSafeAddress } from '../addresses';
 import { toGeckoNetwork } from '../chains';
 import { fetchJson } from '../http';
+import type { Candle, TraderRow } from '@/types/token';
 
 const BASE = 'https://api.geckoterminal.com/api/v2';
 const HEADERS = { accept: 'application/json;version=20230302' };
 
 export const TIMEFRAMES = {
-  '1m': { path: 'minute', aggregate: 1 },
-  '5m': { path: 'minute', aggregate: 5 },
-  '15m': { path: 'minute', aggregate: 15 },
-  '1h': { path: 'hour', aggregate: 1 },
-  '4h': { path: 'hour', aggregate: 4 },
-  '1d': { path: 'day', aggregate: 1 },
+  '1m': { unit: 'minute', agg: 1 },
+  '5m': { unit: 'minute', agg: 5 },
+  '15m': { unit: 'minute', agg: 15 },
+  '1h': { unit: 'hour', agg: 1 },
+  '4h': { unit: 'hour', agg: 4 },
+  '1d': { unit: 'day', agg: 1 },
 } as const;
 export type Timeframe = keyof typeof TIMEFRAMES;
 export const isTimeframe = (v: string): v is Timeframe => v in TIMEFRAMES;
 
-export interface Candle { t: number; o: number; h: number; l: number; c: number; v: number } // t = segundos (unix)
-export interface ChartTrade {
-  t: number; // segundos (unix)
-  side: 'buy' | 'sell';
-  price: number; // USD por token
-  usd: number;
-  wallet: string;
-  tx: string;
-}
-export interface ChartData { candles: Candle[]; trades: ChartTrade[] }
-
-const num = (v: unknown): number => {
-  const n = typeof v === 'string' ? parseFloat(v) : typeof v === 'number' ? v : NaN;
-  return Number.isFinite(n) ? n : NaN;
-};
-
-interface RawOhlcv { data?: { attributes?: { ohlcv_list?: unknown[][] } } }
-interface RawTrades {
-  data?: {
-    attributes?: {
-      block_timestamp?: string;
-      tx_hash?: string;
-      tx_from_address?: string;
-      kind?: string;
-      volume_in_usd?: string;
-      from_token_address?: string;
-      to_token_address?: string;
-      price_from_in_usd?: string;
-      price_to_in_usd?: string;
-    };
-  }[];
-}
-
-async function fetchCandles(network: string, pool: string, token: string, tf: Timeframe): Promise<Candle[]> {
-  const { path, aggregate } = TIMEFRAMES[tf];
-  const url = `${BASE}/networks/${network}/pools/${pool}/ohlcv/${path}?aggregate=${aggregate}&limit=200&currency=usd&token=${token}`;
-  const raw = await fetchJson<RawOhlcv>(url, { revalidate: 20, headers: HEADERS });
-  const list = raw.data?.attributes?.ohlcv_list ?? [];
-  return list
-    .map((r) => ({ t: num(r[0]), o: num(r[1]), h: num(r[2]), l: num(r[3]), c: num(r[4]), v: num(r[5]) }))
-    .filter((c) => [c.t, c.o, c.h, c.l, c.c].every(Number.isFinite) && c.c > 0)
-    .map((c) => ({ ...c, v: Number.isFinite(c.v) ? c.v : 0 }))
-    .sort((a, b) => a.t - b.t);
-}
-
-/** Últimas operaciones del pool (GeckoTerminal devuelve hasta 300 de las últimas 24 h). */
-async function fetchTrades(network: string, pool: string, token: string): Promise<ChartTrade[]> {
-  const raw = await fetchJson<RawTrades>(`${BASE}/networks/${network}/pools/${pool}/trades`, { revalidate: 20, headers: HEADERS });
-  const me = token.toLowerCase();
-  const out: ChartTrade[] = [];
-  for (const d of raw.data ?? []) {
-    const a = d.attributes;
-    if (!a?.tx_from_address || !a.block_timestamp) continue;
-    // "buy/sell" de GeckoTerminal es respecto al token base del pool; nosotros lo calculamos respecto a NUESTRO token.
-    const to = a.to_token_address?.toLowerCase();
-    const from = a.from_token_address?.toLowerCase();
-    let side: 'buy' | 'sell';
-    let price: number;
-    if (to === me) { side = 'buy'; price = num(a.price_to_in_usd); }
-    else if (from === me) { side = 'sell'; price = num(a.price_from_in_usd); }
-    else continue;
-    const t = Math.floor(Date.parse(a.block_timestamp) / 1000);
-    const usd = num(a.volume_in_usd);
-    if (!Number.isFinite(t) || !(price > 0) || !Number.isFinite(usd)) continue;
-    out.push({ t, side, price, usd, wallet: a.tx_from_address, tx: a.tx_hash ?? '' });
-  }
-  return out.sort((a, b) => a.t - b.t);
-}
-
-export async function getChartData(chain: string, pool: string, token: string, tf: Timeframe): Promise<ChartData | null> {
+export async function getCandles(chain: string, pair: string, token: string, tf: Timeframe, limit: number): Promise<Candle[]> {
   const network = toGeckoNetwork(chain);
-  if (!network) return null;
-  const tok = cacheSafeAddress(token);
-  const candles = await cached(`chart:c:${chain}:${cacheSafeAddress(pool)}:${tok}:${tf}`, 20_000, () => fetchCandles(network, pool, token, tf), 60_000);
-  if (!candles.length) return null;
-  // Las operaciones son un extra: si fallan (límite de la API) igual mostramos las velas.
-  const trades = await cached(`chart:t:${chain}:${cacheSafeAddress(pool)}:${tok}`, 30_000, () => fetchTrades(network, pool, token), 60_000).catch(() => [] as ChartTrade[]);
-  return { candles, trades };
+  if (!network) return [];
+  const { unit, agg } = TIMEFRAMES[tf];
+  return cached(`gecko:ohlcv:${chain}:${pair}:${tf}:${limit}`, 4_000, async () => {
+    const raw = await fetchJson<{ data?: { attributes?: { ohlcv_list?: number[][] } } }>(
+      `${BASE}/networks/${network}/pools/${pair}/ohlcv/${unit}?aggregate=${agg}&limit=${limit}&currency=usd&token=${token}`,
+      { revalidate: 0, headers: HEADERS },
+    );
+    const list = raw.data?.attributes?.ohlcv_list ?? [];
+    const seen = new Set<number>();
+    return list
+      .map(([time, open, high, low, close, volume]) => ({ time, open, high, low, close, volume }))
+      .filter((c) => Number.isFinite(c.time) && !seen.has(c.time) && seen.add(c.time))
+      .sort((a, b) => a.time - b.time);
+  });
+}
+
+interface RawTrade {
+  attributes?: { tx_from_address?: string; kind?: string; volume_in_usd?: string; block_timestamp?: string };
+}
+
+/**
+ * "Traders más movidos": agrupa los últimos trades del pool por wallet. Es ACTIVIDAD reciente (volumen comprado/vendido),
+ * no ganancias: calcular PnL real por wallet necesita un proveedor con key (Birdeye / Helius / Solscan).
+ */
+export async function getTopTraders(chain: string, pair: string): Promise<TraderRow[]> {
+  const network = toGeckoNetwork(chain);
+  if (!network) return [];
+  return cached(`gecko:traders:${chain}:${pair}`, 20_000, async () => {
+    const raw = await fetchJson<{ data?: RawTrade[] }>(`${BASE}/networks/${network}/pools/${pair}/trades`, {
+      revalidate: 0,
+      headers: HEADERS,
+    });
+    const by = new Map<string, TraderRow>();
+    for (const t of raw.data ?? []) {
+      const a = t.attributes;
+      const addr = a?.tx_from_address;
+      const usd = Number(a?.volume_in_usd ?? 0);
+      if (!addr || !Number.isFinite(usd)) continue;
+      const row = by.get(addr) ?? { address: addr, trades: 0, buyUsd: 0, sellUsd: 0, netUsd: 0, lastAt: 0 };
+      row.trades += 1;
+      if (a?.kind === 'buy') row.buyUsd += usd; else row.sellUsd += usd;
+      row.lastAt = Math.max(row.lastAt, a?.block_timestamp ? Date.parse(a.block_timestamp) || 0 : 0);
+      by.set(addr, row);
+    }
+    return [...by.values()]
+      .map((r) => ({ ...r, netUsd: r.buyUsd - r.sellUsd }))
+      .sort((a, b) => b.buyUsd + b.sellUsd - (a.buyUsd + a.sellUsd))
+      .slice(0, 12);
+  });
 }

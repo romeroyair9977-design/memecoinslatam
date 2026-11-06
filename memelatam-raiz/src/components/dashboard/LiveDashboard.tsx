@@ -2,20 +2,38 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { RefreshCw, SlidersHorizontal } from 'lucide-react';
-import { DASHBOARD_POLL_MS } from '@/lib/config';
+import { cacheSafeAddress } from '@/lib/addresses';
+import { DASHBOARD_POLL_MS, PRICE_POLL_MS } from '@/lib/config';
+import { usePolling } from '@/lib/hooks/live';
 import { activeFilterCount, buildColumns, COLUMN_META, COLUMN_ORDER, DEFAULT_FILTERS, type DashFilters } from '@/lib/filters';
 import { getBrowserSupabase } from '@/lib/supabase/client';
-import { formatAge } from '@/lib/utils';
 import { tokenKey } from '@/types/community';
-import type { Dashboard } from '@/types/token';
+import type { Dashboard, LiveMarket, TokenSummary } from '@/types/token';
 import { FiltersPanel } from './FiltersPanel';
 import { TokenColumn } from './TokenColumn';
 import { TrendingStrip } from './TrendingStrip';
 
-const STORAGE_KEY = 'veltrix:filters:v1';
+const STORAGE_KEY = 'memelatam:filters:v1';
 const FRESH_MS = 45_000; // cuánto tiempo se resalta una memecoin recién aparecida
 
 const keyOf = (t: { chain: string; address: string }) => `${t.chain}:${t.address}`;
+
+/** Superpone los números "en vivo" sobre un token (solo si son más recientes que `since`). */
+function applyLive(t: TokenSummary, live: Record<string, LiveMarket>, since = 0): TokenSummary {
+  const l = live[`${t.chain}:${cacheSafeAddress(t.address)}`];
+  if (!l || l.updatedAt <= since) return t;
+  return {
+    ...t,
+    priceUsd: l.priceUsd,
+    change24h: l.change.h24,
+    marketCap: l.marketCap || l.fdv || t.marketCap,
+    liquidityUsd: l.liquidityUsd,
+    volume24h: l.volume24h,
+    buys24h: l.buys24h,
+    sells24h: l.sells24h,
+    txns24h: l.buys24h + l.sells24h,
+  };
+}
 
 /** Une lo guardado con los defaults para que agregar campos nuevos en el futuro no rompa filtros viejos. */
 function loadFilters(): DashFilters {
@@ -55,6 +73,8 @@ export function LiveDashboard({ initial, memberCounts, boosts: initialBoosts }: 
   const [now, setNow] = useState(initial?.updatedAt ?? 0);
   const known = useRef<Set<string>>(new Set((initial?.tokens ?? []).map(keyOf)));
   const freshTimer = useRef<ReturnType<typeof setTimeout>>();
+  const dataRef = useRef<Dashboard | null>(initial);
+  const liveRef = useRef<Record<string, LiveMarket>>({});
 
   // Filtros guardados (se leen tras montar para no romper la hidratación).
   useEffect(() => { setFilters(loadFilters()); }, []);
@@ -66,14 +86,12 @@ export function LiveDashboard({ initial, memberCounts, boosts: initialBoosts }: 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      // Dashboard y boosts en paralelo (antes uno esperaba al otro).
-      const sb = getBrowserSupabase();
-      const boostsReq = sb
-        ? Promise.resolve(sb.from('active_boosts').select('token_key, total')).then((r) => r.data, () => null)
-        : Promise.resolve(null);
       const res = await fetch('/api/dashboard', { cache: 'no-store' });
       if (!res.ok) throw new Error(String(res.status));
       const next = (await res.json()) as Dashboard;
+      // La lista llega con cache de hasta ~20 s: se le superponen los precios en vivo más recientes para que no "retroceda".
+      next.tokens = next.tokens.map((t) => applyLive(t, liveRef.current, next.updatedAt));
+      next.trending = next.trending.map((t) => applyLive(t, liveRef.current, next.updatedAt));
       const arrived = next.tokens.filter((t) => !known.current.has(keyOf(t))).map(keyOf);
       next.tokens.forEach((t) => known.current.add(keyOf(t)));
       if (arrived.length && known.current.size > arrived.length) {
@@ -81,11 +99,16 @@ export function LiveDashboard({ initial, memberCounts, boosts: initialBoosts }: 
         clearTimeout(freshTimer.current);
         freshTimer.current = setTimeout(() => setFresh(new Set()), FRESH_MS);
       }
+      dataRef.current = next;
       setData(next);
       setNow(Date.now());
       setFailed(false);
-      const b = (await boostsReq) as { token_key: string; total: number }[] | null;
-      if (b) setBoosts(Object.fromEntries(b.map((r) => [r.token_key, r.total])));
+      // Boosts vigentes (lectura pública de la vista `active_boosts`).
+      const sb = getBrowserSupabase();
+      if (sb) {
+        const { data: b } = await sb.from('active_boosts').select('token_key, total');
+        if (b) setBoosts(Object.fromEntries(b.map((r: { token_key: string; total: number }) => [r.token_key, r.total])));
+      }
     } catch {
       setFailed(true); // se conserva lo último que se vio
     } finally {
@@ -93,7 +116,27 @@ export function LiveDashboard({ initial, memberCounts, boosts: initialBoosts }: 
     }
   }, []);
 
-  // Auto-actualización: cada 20 s mientras la pestaña esté visible, y al volver a ella.
+  // Precios y números en vivo (consulta liviana). Se pide el mismo conjunto canónico de tokens para que el servidor
+  // lo comparta entre usuarios: los 90 con más volumen, ordenados por clave.
+  const refreshPrices = useCallback(async () => {
+    const d = dataRef.current;
+    if (!d || d.tokens.length === 0) return;
+    const picked = [...d.tokens].sort((a, b) => b.volume24h - a.volume24h).slice(0, 90).map(keyOf).sort();
+    const res = await fetch(`/api/prices?t=${encodeURIComponent(picked.join(','))}`, { cache: 'no-store' });
+    if (!res.ok) return;
+    const live = (await res.json()) as Record<string, LiveMarket>;
+    liveRef.current = live;
+    setData((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, tokens: prev.tokens.map((t) => applyLive(t, live)), trending: prev.trending.map((t) => applyLive(t, live)) };
+      dataRef.current = next;
+      return next;
+    });
+    setNow(Date.now());
+  }, []);
+  usePolling(refreshPrices, PRICE_POLL_MS);
+
+  // Auto-actualización de la LISTA (entran memecoins nuevas): cada 20 s mientras la pestaña esté visible, y al volver a ella.
   useEffect(() => {
     if (!initial) void refresh(); // la carga inicial falló en el servidor: reintenta ya
     const poll = setInterval(() => { if (!document.hidden) void refresh(); }, DASHBOARD_POLL_MS);
@@ -107,6 +150,14 @@ export function LiveDashboard({ initial, memberCounts, boosts: initialBoosts }: 
       clearTimeout(freshTimer.current);
     };
   }, [initial, refresh]);
+
+  /** "Aplicar": guarda los filtros, cierra el panel, trae datos frescos y lleva al usuario a las columnas. */
+  const applyFilters = useCallback((f: DashFilters) => {
+    updateFilters(f);
+    setPanelOpen(false);
+    void refresh();
+    setTimeout(() => document.getElementById('dashboard')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+  }, [updateFilters, refresh]);
 
   // Los tokens con boost suben al inicio de su columna (a más $LATAM, más arriba). sort() es estable: el resto no cambia.
   const columns = useMemo(() => {
@@ -134,7 +185,7 @@ export function LiveDashboard({ initial, memberCounts, boosts: initialBoosts }: 
             <span className={`h-2 w-2 rounded-full ${failed ? 'bg-amber-400' : 'animate-pulse bg-emerald-400'}`} aria-hidden />
             {failed
               ? 'No pudimos actualizar. Mostrando lo último que cargó.'
-              : data ? `En vivo · actualizado ${formatAge(data.updatedAt)}` : 'Cargando memecoins…'}
+              : data ? `En vivo · números cada ${PRICE_POLL_MS / 1000} s · lista cada ${DASHBOARD_POLL_MS / 1000} s` : 'Cargando memecoins…'}
           </p>
           <div className="flex gap-2">
             <button
@@ -156,7 +207,7 @@ export function LiveDashboard({ initial, memberCounts, boosts: initialBoosts }: 
 
         {!data && !loading && failed && (
           <p role="alert" className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
-            No pudimos cargar el dashboard (las APIs de datos no respondieron). Reintentamos solos cada 20 s.
+            No pudimos cargar el dashboard (las APIs de datos no respondieron). Reintentamos solos cada 30 s.
           </p>
         )}
 
@@ -177,7 +228,7 @@ export function LiveDashboard({ initial, memberCounts, boosts: initialBoosts }: 
         <p className="mt-3 text-xs text-muted">Clasificación heurística con datos de DexScreener, GeckoTerminal y RugCheck. No es asesoría financiera.</p>
       </section>
 
-      {panelOpen && <FiltersPanel filters={filters} tokens={data?.tokens ?? []} onApply={updateFilters} onClose={() => setPanelOpen(false)} />}
+      {panelOpen && <FiltersPanel filters={filters} tokens={data?.tokens ?? []} onApply={applyFilters} onClose={() => setPanelOpen(false)} />}
     </div>
   );
 }

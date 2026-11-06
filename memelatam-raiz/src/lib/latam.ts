@@ -1,11 +1,14 @@
-/** Reglas del token interno de la plataforma. Los montos reales los aplica Postgres (supabase/migrations/0002_latam.sql y 0003_predicciones.sql);
+/** Reglas del token interno de la plataforma. Los montos reales los aplica Postgres (supabase/migrations/0002_latam.sql);
  *  estas constantes solo sirven para mostrarlos en la UI. Si cambias uno, cámbialo también en el SQL. */
 export const LATAM = {
   symbol: '$LATAM',
   welcome: 5,
-  thesis: 3,
+  thesis: 2,
   community: 10,
   reaction: 1,
+  /** Predicción de permanencia: cuesta 2 y, si aciertas, recibes 4. */
+  predictionStake: 2,
+  predictionPayout: 4,
   featureThesisCost: 20,
   /** 10 $LATAM = 1 hora de boost */
   boostPerHour: 10,
@@ -25,5 +28,6 @@ export const POINT_REASONS: Record<string, string> = {
   invitacion: 'Invitación',
   boost: 'Boost a un token',
   tesis_destacada: 'Tesis destacada',
-  prediccion: 'Predicción acertada',
+  prediccion: 'Predicción',
+  prediccion_ganada: 'Predicción acertada',
 };

@@ -99,23 +99,12 @@ export async function getTrendingPoolTokens(chain: string): Promise<ProfileRef[]
   return poolTokens(chain, 'trending_pools');
 }
 
-/** Pools con más volumen 24 h (tokens ya establecidos: alimentan "Migrando" y los rankings de memecoins más viejas). */
-export async function getTopVolumeTokens(chain: string, page = 1): Promise<ProfileRef[]> {
-  return poolTokens(chain, 'pools', `sort=h24_volume_usd_desc&page=${page}`);
-}
-
-/** Trending por ventana de 24 h (más estable que la de 1 h). */
-export async function getTrending24hTokens(chain: string): Promise<ProfileRef[]> {
-  return poolTokens(chain, 'trending_pools', 'duration=24h');
-}
-
-async function poolTokens(chain: string, kind: 'new_pools' | 'trending_pools' | 'pools', query = ''): Promise<ProfileRef[]> {
+async function poolTokens(chain: string, kind: 'new_pools' | 'trending_pools'): Promise<ProfileRef[]> {
   const network = toGeckoNetwork(chain);
   if (!network) return [];
-  return cached(`gecko:${kind}:${chain}:${query}`, TTL.dashboard * 3, async () => {
-    const raw = await fetchJson<RawPools>(`${BASE}/networks/${network}/${kind}${query ? `?${query}` : ''}`, {
+  return cached(`gecko:${kind}:${chain}`, TTL.dashboard, async () => {
+    const raw = await fetchJson<RawPools>(`${BASE}/networks/${network}/${kind}`, {
       revalidate: 60,
-      timeoutMs: 4_000,
       headers: HEADERS,
     });
     return (raw.data ?? [])

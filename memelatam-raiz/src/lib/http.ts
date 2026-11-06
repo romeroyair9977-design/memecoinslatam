@@ -20,7 +20,8 @@ export async function fetchJson<T>(url: string, opts: FetchOpts = {}): Promise<T
     const res = await fetch(url, {
       signal: ctrl.signal,
       headers: { accept: 'application/json', ...opts.headers },
-      next: { revalidate: opts.revalidate ?? 30 },
+      // revalidate: 0 → sin cache de Next (datos "en vivo"); otro valor → Data Cache de Next por esos segundos.
+      ...(opts.revalidate === 0 ? { cache: 'no-store' as const } : { next: { revalidate: opts.revalidate ?? 30 } }),
     });
     if (!res.ok) throw new HttpError(res.status, `HTTP ${res.status} en ${url}`);
     return (await res.json()) as T;

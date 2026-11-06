@@ -3,7 +3,8 @@ import { Rocket, Users } from 'lucide-react';
 import type { ColumnId, TokenSummary } from '@/types/token';
 import { badgeFor, PREFERRED_TOP10 } from '@/lib/filters';
 import { chainLabel } from '@/lib/chains';
-import { cn, formatAge, formatPct, formatPrice, formatUsd } from '@/lib/utils';
+import { cn, formatAge } from '@/lib/utils';
+import { LiveValue } from '@/components/live/LiveValue';
 import { ActivityBadge } from './RiskBadge';
 
 export function TokenAvatar({ src, symbol, size = 36 }: { src: string | null; symbol: string; size?: number }) {
@@ -28,7 +29,6 @@ interface CardProps {
 }
 
 export function TokenCard({ t, members, column, fresh, boost }: CardProps) {
-  const up = t.change24h >= 0;
   const pref = column ? PREFERRED_TOP10[column] : undefined;
   const topOk = t.top10Pct !== null && pref !== undefined ? t.top10Pct <= pref : null;
   return (
@@ -50,14 +50,14 @@ export function TokenCard({ t, members, column, fresh, boost }: CardProps) {
           <p suppressHydrationWarning className="text-xs text-muted">{chainLabel(t.chain)} · {formatAge(t.pairCreatedAt)}</p>
         </div>
         <div className="text-right">
-          <p className="text-sm">{formatPrice(t.priceUsd)}</p>
-          <p className={cn('text-xs font-medium', up ? 'text-emerald-400' : 'text-rose-400')}>{formatPct(t.change24h)}</p>
+          <p className="text-sm"><LiveValue value={t.priceUsd} kind="price" /></p>
+          <p className="text-xs font-medium"><LiveValue value={t.change24h} kind="pct" signed /></p>
         </div>
       </div>
       <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
-        <div><dt className="text-muted">MC</dt><dd>{formatUsd(t.marketCap)}</dd></div>
-        <div><dt className="text-muted">Liquidez</dt><dd>{formatUsd(t.liquidityUsd)}</dd></div>
-        <div><dt className="text-muted">Vol 24h</dt><dd>{formatUsd(t.volume24h)}</dd></div>
+        <div><dt className="text-muted">MC</dt><dd><LiveValue value={t.marketCap} kind="usd" /></dd></div>
+        <div><dt className="text-muted">Liquidez</dt><dd><LiveValue value={t.liquidityUsd} kind="usd" /></dd></div>
+        <div><dt className="text-muted">Vol 24h</dt><dd><LiveValue value={t.volume24h} kind="usd" /></dd></div>
       </dl>
       <div className="mt-3 flex items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">

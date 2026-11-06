@@ -88,10 +88,11 @@ export function pickPrimaryPair(pairs: Pair[]): Pair | null {
  * Busca todos los pares donde el token es base, en TODAS las chains (autodetecta la chain).
  * Devuelve [] si el token no existe o no tiene pools.
  */
-export async function getTokenByAddress(address: string): Promise<Pair[]> {
-  return cached(`dex:token:${cacheSafeAddress(address)}`, TTL.price, async () => {
+export async function getTokenByAddress(address: string, opts: { fresh?: boolean } = {}): Promise<Pair[]> {
+  const ttl = opts.fresh ? TTL.live : TTL.price;
+  return cached(`dex:token:${opts.fresh ? 'live:' : ''}${cacheSafeAddress(address)}`, ttl, async () => {
     const data = await fetchJson<{ pairs: RawPair[] | null }>(`${BASE}/latest/dex/tokens/${address}`, {
-      revalidate: 30,
+      revalidate: opts.fresh ? 0 : 30,
     });
     const pairs = (data.pairs ?? []).map(normalizePair);
     const wanted = address.toLowerCase();
@@ -101,10 +102,10 @@ export async function getTokenByAddress(address: string): Promise<Pair[]> {
 }
 
 /** Hasta 30 tokens de la misma chain por request. */
-export async function getTokensBatch(chain: string, addresses: string[]): Promise<Pair[]> {
+export async function getTokensBatch(chain: string, addresses: string[], opts: { fresh?: boolean } = {}): Promise<Pair[]> {
   if (!addresses.length) return [];
   const list = addresses.slice(0, 30).join(',');
-  const raw = await fetchJson<RawPair[]>(`${BASE}/tokens/v1/${chain}/${list}`, { revalidate: 15, timeoutMs: 5_000 });
+  const raw = await fetchJson<RawPair[]>(`${BASE}/tokens/v1/${chain}/${list}`, { revalidate: opts.fresh ? 0 : 30 });
   return (Array.isArray(raw) ? raw : []).map(normalizePair);
 }
 
@@ -126,20 +127,11 @@ export async function getCandidateRefs(): Promise<ProfileRef[]> {
     `${BASE}/token-boosts/latest/v1`,
     `${BASE}/token-boosts/top/v1`,
   ];
-  const results = await Promise.allSettled(urls.map((u) => fetchJson<RawProfile[]>(u, { revalidate: 60, timeoutMs: 4_000 })));
+  const results = await Promise.allSettled(urls.map((u) => fetchJson<RawProfile[]>(u, { revalidate: 60 })));
   const refs: ProfileRef[] = [];
   for (const r of results) {
     if (r.status !== 'fulfilled' || !Array.isArray(r.value)) continue;
     for (const item of r.value) refs.push({ chain: item.chainId, address: item.tokenAddress });
   }
   return refs;
-}
-
-/** Par "en vivo" para refrescar precio y cifras en pantalla: cache de 4 s y sin la caché larga de Next. */
-export async function getLivePair(chain: string, token: string, pool: string): Promise<Pair | null> {
-  return cached(`dex:live:${chain}:${cacheSafeAddress(token)}:${pool}`, 4_000, async () => {
-    const raw = await fetchJson<RawPair[]>(`${BASE}/tokens/v1/${chain}/${token}`, { revalidate: 3, timeoutMs: 5_000 });
-    const pairs = (Array.isArray(raw) ? raw : []).map(normalizePair);
-    return pairs.find((p) => p.pairAddress.toLowerCase() === pool.toLowerCase()) ?? pickPrimaryPair(pairs);
-  });
 }

@@ -4,38 +4,39 @@
  * TODOS los tokens resumidos. El reparto en columnas lo hace `buildColumns` (lib/filters.ts) en el cliente,
  * así el panel de filtros avanzados responde al instante sin pedir nada al servidor.
  */
-import { cached, withTimeout } from '../cache';
+import { cached } from '../cache';
 import { cacheSafeAddress } from '../addresses';
 import { isSupportedChain } from '../chains';
 import { TTL } from '../config';
 import { computeActivity } from '../activity';
 import { getCandidateRefs, getTokensBatch, pickPrimaryPair, type ProfileRef } from './dexscreener';
-import { getNewPoolTokens, getTopVolumeTokens, getTrendingPoolTokens } from './geckoterminal';
+import { getNewPoolTokens, getTrendingPoolTokens } from './geckoterminal';
 import { getRugCheckOverview } from './rugcheck';
 import { getBoostedRefs } from './community';
 import type { Dashboard, Pair, TokenSummary } from '@/types/token';
 
-const MAX_CANDIDATES = 240;
-const SOURCE_TIMEOUT_MS = 3_500; // una fuente lenta no frena a las demás
+const MAX_CANDIDATES = 210;
 const MIN_LIQUIDITY = 1_000; // descarta pools vacíos/polvo
 const TOP10_MAX_LOOKUPS = 30; // consultas a RugCheck por refresco
-const TOP10_BUDGET_MS = 1_200; // RugCheck es lo más lento: NO bloquea la respuesta; lo que falte se completa solo (queda en cache)
+const TOP10_BUDGET_MS = 3_000; // lo que no alcance, se completa en el siguiente refresco (queda en cache 5 min)
+const SOURCE_TIMEOUT_MS = 4_000; // una fuente lenta nunca bloquea el dashboard completo
+
+/** Resuelve con `fallback` si la promesa tarda más de `ms` (la promesa original sigue y llena el cache). */
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
+}
 
 async function gatherCandidates(): Promise<ProfileRef[]> {
   const t = (p: Promise<ProfileRef[]>) => withTimeout(p, SOURCE_TIMEOUT_MS, [] as ProfileRef[]);
-  const lists = await Promise.all([
-    t(getBoostedRefs()), // primero: los tokens con boost siempre entran al dashboard
+  const settled = await Promise.allSettled([
+    t(getBoostedRefs()), // primero: los tokens con boost de $LATAM siempre entran al dashboard
     t(getNewPoolTokens('solana')),
     t(getNewPoolTokens('base')),
     t(getTrendingPoolTokens('solana')),
     t(getTrendingPoolTokens('base')),
     t(getCandidateRefs()),
-    // Tokens ya establecidos con volumen: sin esto, "Migrando" y "Con tracción" casi nunca tendrían candidatos.
-    t(getTopVolumeTokens('solana', 1)),
-    t(getTopVolumeTokens('solana', 2)),
-    t(getTopVolumeTokens('base', 1)),
   ]);
-  const all = lists.flat();
+  const all = settled.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
   const seen = new Set<string>();
   const out: ProfileRef[] = [];
   for (const ref of all) {
@@ -95,44 +96,42 @@ async function enrichTop10(tokens: TokenSummary[]): Promise<void> {
     const worker = async () => {
       while (i < targets.length) {
         const t = targets[i++];
-        const o = await withTimeout(getRugCheckOverview(t.address), 8_000, null);
+        const o = await getRugCheckOverview(t.address).catch(() => null);
         if (o?.holders.top10Pct != null) t.top10Pct = Math.round(o.holders.top10Pct * 10) / 10;
       }
     };
-    await Promise.all(Array.from({ length: 6 }, worker));
+    await Promise.all(Array.from({ length: 8 }, worker));
   })();
   await Promise.race([work, new Promise((r) => setTimeout(r, TOP10_BUDGET_MS))]);
 }
 
 export function getDashboard(): Promise<Dashboard> {
-  return cached('dashboard', TTL.dashboard, buildDashboard, TTL.dashboardStale);
-}
+  return cached('dashboard', TTL.dashboard, async () => {
+    const candidates = await gatherCandidates();
 
-async function buildDashboard(): Promise<Dashboard> {
-  const candidates = await gatherCandidates();
+    // Agrupa por chain y consulta en lotes de 30 (límite de DexScreener).
+    const byChain = new Map<string, string[]>();
+    for (const c of candidates) byChain.set(c.chain, [...(byChain.get(c.chain) ?? []), c.address]);
 
-  // Agrupa por chain y consulta en lotes de 30 (límite de DexScreener).
-  const byChain = new Map<string, string[]>();
-  for (const c of candidates) byChain.set(c.chain, [...(byChain.get(c.chain) ?? []), c.address]);
+    const requests: Promise<Pair[]>[] = [];
+    for (const [chain, addrs] of byChain)
+      for (let i = 0; i < addrs.length; i += 30) requests.push(getTokensBatch(chain, addrs.slice(i, i + 30)));
+    const pairs = (await Promise.allSettled(requests)).flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
 
-  const requests: Promise<Pair[]>[] = [];
-  for (const [chain, addrs] of byChain)
-    for (let i = 0; i < addrs.length; i += 30) requests.push(getTokensBatch(chain, addrs.slice(i, i + 30)));
-  const pairs = (await Promise.all(requests.map((r) => withTimeout(r, 5_000, [] as Pair[])))).flat();
+    // Agrupa pares por token (chain + address del token base).
+    const grouped = new Map<string, Pair[]>();
+    for (const p of pairs) {
+      const key = `${p.chainId}:${cacheSafeAddress(p.baseToken.address)}`;
+      grouped.set(key, [...(grouped.get(key) ?? []), p]);
+    }
 
-  // Agrupa pares por token (chain + address del token base).
-  const grouped = new Map<string, Pair[]>();
-  for (const p of pairs) {
-    const key = `${p.chainId}:${cacheSafeAddress(p.baseToken.address)}`;
-    grouped.set(key, [...(grouped.get(key) ?? []), p]);
-  }
+    const tokens = [...grouped.values()].map(summarize).filter((s): s is TokenSummary => s !== null);
+    await enrichTop10(tokens);
 
-  const tokens = [...grouped.values()].map(summarize).filter((s): s is TokenSummary => s !== null);
-  await enrichTop10(tokens);
-
-  return {
-    tokens,
-    trending: [...tokens].filter((t) => t.liquidityUsd >= 5_000).sort((a, b) => b.trendScore - a.trendScore).slice(0, 10),
-    updatedAt: Date.now(),
-  };
+    return {
+      tokens,
+      trending: [...tokens].filter((t) => t.liquidityUsd >= 5_000).sort((a, b) => b.trendScore - a.trendScore).slice(0, 10),
+      updatedAt: Date.now(),
+    };
+  });
 }

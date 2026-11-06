@@ -33,9 +33,9 @@ export function formatNumber(n: number | null | undefined): string {
 }
 
 /** "hace 5 min", "hace 3 h", "hace 12 d" */
-export function formatAge(ts: number | null | undefined): string {
+export function formatAge(ts: number | null | undefined, now: number = Date.now()): string {
   if (!ts) return '—';
-  const diff = Date.now() - ts;
+  const diff = now - ts;
   const min = Math.floor(diff / 60_000);
   if (min < 1) return 'hace segundos';
   if (min < 60) return `hace ${min} min`;

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import type { TokenSummary } from '@/types/token';
 import { TokenAvatar } from '@/components/token/TokenCard';
-import { cn, formatPct } from '@/lib/utils';
+import { LiveValue } from '@/components/live/LiveValue';
 
 function Chip({ t, dup }: { t: TokenSummary; dup?: boolean }) {
   return (
@@ -12,7 +12,7 @@ function Chip({ t, dup }: { t: TokenSummary; dup?: boolean }) {
     >
       <TokenAvatar src={t.imageUrl} symbol={t.symbol} size={24} />
       <span className="font-medium">{t.symbol}</span>
-      <span className={cn('text-xs', t.change24h >= 0 ? 'text-emerald-400' : 'text-rose-400')}>{formatPct(t.change24h, 0)}</span>
+      <span className="text-xs"><LiveValue value={t.change24h} kind="pct" signed /></span>
     </Link>
   );
 }

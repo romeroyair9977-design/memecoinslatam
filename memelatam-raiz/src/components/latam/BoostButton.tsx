@@ -63,7 +63,7 @@ export function BoostButton({ chain, address, symbol, activeTotal, loggedIn }: P
               </button>
             ))}
           </div>
-          {balance < BOOST_OPTIONS[0] && <p className="mt-2 text-xs text-muted">Te faltan $LATAM. Gánalos publicando tesis (+15), creando comunidades (+50) o recibiendo reacciones (+1).</p>}
+          {balance < BOOST_OPTIONS[0] && <p className="mt-2 text-xs text-muted">Te faltan $LATAM. Gánalos publicando tesis (+2), creando comunidades (+10), recibiendo reacciones (+1) o acertando predicciones.</p>}
         </div>
       )}
       {msg && <p role={msg.ok ? 'status' : 'alert'} className={cn('text-sm', msg.ok ? 'text-emerald-300' : 'text-rose-400')}>{msg.text}</p>}

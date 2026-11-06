@@ -1,15 +1,13 @@
 import Link from 'next/link';
-import { SITE } from '@/lib/config';
+import { PARENT, SITE } from '@/lib/config';
 import { SearchBar } from '@/components/search/SearchBar';
 import { UserMenu } from '@/components/auth/UserMenu';
 
 const NAV = [
+  { href: '/tendencias-x', label: 'Tendencias en X' },
   { href: '/#dashboard', label: 'Dashboard' },
-  { href: '/tendencias', label: 'Tendencias X' },
-  { href: '/ranking', label: 'Ranking' },
-  { href: '/predicciones', label: 'Predicciones' },
-  { href: '/wallets', label: 'Wallets' },
   { href: '/comunidad', label: 'Comunidad' },
+  { href: '/ranking', label: 'Ranking' },
   { href: '/actividad', label: 'Actividad' },
 ];
 
@@ -17,11 +15,11 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-bg/90 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4 sm:px-6">
-        <Link href="/" className="flex shrink-0 flex-col font-display text-xl font-bold leading-none tracking-tight">
-          {SITE.name}
-          <span className="mt-0.5 hidden text-[10px] font-normal tracking-wider text-muted lg:block">por {SITE.brand}</span>
-        </Link>
-        <nav aria-label="Principal" className="hidden items-center gap-4 whitespace-nowrap text-sm text-muted sm:flex">
+        <div className="leading-none">
+          <Link href="/" className="font-display text-xl font-bold tracking-tight">{SITE.name}</Link>
+          <a href={PARENT.url} className="mt-0.5 hidden text-[10px] text-muted hover:text-ink sm:block">por {PARENT.name}</a>
+        </div>
+        <nav aria-label="Principal" className="hidden items-center gap-4 text-sm text-muted sm:flex">
           {NAV.map((n) => (
             <Link key={n.href} href={n.href} className="hover:text-ink">{n.label}</Link>
           ))}
