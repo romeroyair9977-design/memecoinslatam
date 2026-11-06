@@ -161,3 +161,30 @@ export interface Dashboard {
   trending: TokenSummary[];
   updatedAt: number;
 }
+
+/* ───────── Datos "en vivo" (consulta liviana, sin RugCheck) ───────── */
+export interface LiveMarket {
+  priceUsd: number;
+  change: Record<TimeWindow, number>;
+  marketCap: number;
+  fdv: number;
+  liquidityUsd: number;
+  volume24h: number;
+  buys24h: number;
+  sells24h: number;
+  pairAddress: string;
+  pairCreatedAt: number | null;
+  updatedAt: number;
+}
+
+export interface Candle { time: number; open: number; high: number; low: number; close: number; volume: number }
+
+export interface TraderRow {
+  address: string;
+  trades: number;
+  buyUsd: number;
+  sellUsd: number;
+  /** compras − ventas (USD) en la muestra analizada */
+  netUsd: number;
+  lastAt: number;
+}

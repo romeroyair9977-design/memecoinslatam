@@ -1,62 +1,72 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Fragment } from 'react';
 import { AdSlot } from '@/components/ads/AdSlot';
-import { TokenCard } from '@/components/token/TokenCard';
-import { withTimeout } from '@/lib/cache';
-import { getRankings, type RankingEntry, type Rankings } from '@/lib/services/rankings';
-import { formatAge } from '@/lib/utils';
+import { ALIVE_RULE, PREDICTION_COST, PREDICTION_PAYOUT } from '@/lib/predictions';
+import { ADSENSE } from '@/lib/config';
+import { formatLatam } from '@/lib/latam';
+import { getLeaderboard } from '@/lib/services/predictions';
+import { isSupabaseConfigured } from '@/lib/supabase/env';
 
-export const metadata: Metadata = {
-  title: 'Ranking de memecoins: las más sonadas, con más volumen y más FOMO',
-  description: 'Rankings en vivo de memecoins: las más sonadas, las de más volumen, las nuevas con más FOMO y las clásicas que siguen vivas.',
-};
 export const revalidate = 60;
-
-const SECTIONS: { id: keyof Omit<Rankings, 'updatedAt'>; title: string; hint: string }[] = [
-  { id: 'sonadas', title: '🔥 Las más sonadas ahora', hint: 'Lo que más se está moviendo en la última hora.' },
-  { id: 'fomo', title: '🚀 Nuevas con más FOMO', hint: 'Menos de 2 días de vida y mucha más compra que venta.' },
-  { id: 'volumen', title: '📈 Más volumen (24 h)', hint: 'Dónde está pasando más dinero.' },
-  { id: 'clasicas', title: '🏛️ Clásicas que siguen vivas', hint: 'Más de 14 días y todavía con volumen. Esta lista se renueva cada hora.' },
-];
-
-function Ranked({ rows }: { rows: RankingEntry[] }) {
-  if (!rows.length) return <p className="rounded-xl border border-dashed border-line p-4 text-sm text-muted">Sin datos por ahora; se llena solo en el próximo refresco.</p>;
-  return (
-    <ol className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-      {rows.map((r, i) => (
-        <li key={`${r.token.chain}:${r.token.address}`} className="relative">
-          <span className="absolute -left-1 -top-1 z-10 grid h-6 w-6 place-items-center rounded-full bg-brand text-xs font-bold text-bg">{i + 1}</span>
-          <TokenCard t={r.token} />
-          <p className="mt-1 px-1 text-xs text-muted">{r.note}</p>
-        </li>
-      ))}
-    </ol>
-  );
-}
+export const metadata: Metadata = {
+  title: 'Ranking de predictores',
+  description: 'Quiénes aciertan cuánto dura una memecoin. Ranking público de la comunidad latina.',
+};
 
 export default async function RankingPage() {
-  const data = await withTimeout<Rankings | null>(getRankings(), 6_000, null);
+  const rows = isSupabaseConfigured ? await getLeaderboard(50) : [];
+
   return (
-    <div className="space-y-8">
-      <header className="space-y-2 pt-2">
-        <h1 className="font-display text-3xl font-bold sm:text-4xl">Ranking de memecoins</h1>
-        <p className="max-w-2xl text-muted">
-          Cuatro listas que se actualizan solas con datos de DexScreener y GeckoTerminal.
-          {data && <> Última actualización {formatAge(data.updatedAt)}.</>} ¿Crees que alguna va a durar? <Link href="/predicciones" className="text-brand hover:underline">Haz tu predicción</Link>.
+    <div className="mx-auto max-w-3xl space-y-6">
+      <header className="space-y-2">
+        <h1 className="font-display text-3xl font-bold">Ranking de predictores</h1>
+        <p className="text-muted">
+          Cada persona apuesta {formatLatam(PREDICTION_COST)} a si una memecoin seguirá viva en 7, 30 o 90 días. Si acierta recibe {formatLatam(PREDICTION_PAYOUT)}. Así se ve quién entiende de verdad qué tokens perduran.
         </p>
+        <p className="text-xs text-muted">{ALIVE_RULE} Las predicciones se resuelven solas cuando vence el plazo; la primera tanda se resuelve a los 7 días.</p>
       </header>
-      {!data && <p role="alert" className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">Las fuentes de datos están lentas. Recarga en unos segundos.</p>}
-      {data && SECTIONS.map((s, i) => (
-        <Fragment key={s.id}>
-          <section className="space-y-3">
-            <div><h2 className="font-display text-xl font-semibold">{s.title}</h2><p className="text-sm text-muted">{s.hint}</p></div>
-            <Ranked rows={data[s.id]} />
-          </section>
-          {i === 1 && <AdSlot slot="ranking" />}
-        </Fragment>
-      ))}
-      <p className="text-xs text-muted">Rankings heurísticos, no recomendaciones. Mucha actividad no significa que un token sea seguro.</p>
+
+      {!isSupabaseConfigured ? (
+        <p className="rounded-xl border border-dashed border-line p-6 text-sm text-muted">El ranking se activa al conectar Supabase.</p>
+      ) : rows.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-line p-6 text-sm text-muted">
+          Todavía nadie ha hecho una predicción. Abre cualquier token y sé el primero en <Link href="/#dashboard" className="text-brand hover:underline">predecir</Link>.
+        </p>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-line">
+          <table className="w-full text-sm">
+            <thead className="bg-panel text-left text-muted">
+              <tr>
+                <th className="p-3 font-medium">#</th>
+                <th className="p-3 font-medium">Usuario</th>
+                <th className="p-3 text-right font-medium">Aciertos</th>
+                <th className="p-3 text-right font-medium">Fallos</th>
+                <th className="p-3 text-right font-medium">% acierto</th>
+                <th className="p-3 text-right font-medium">Abiertas</th>
+                <th className="p-3 text-right font-medium">Neto $LATAM</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => {
+                const done = r.wins + r.losses;
+                return (
+                  <tr key={r.user_id} className="border-t border-line">
+                    <td className="p-3 text-muted">{i + 1}</td>
+                    <td className="p-3"><Link href={`/perfil/${r.username}`} className="font-medium hover:text-brand">@{r.username}</Link></td>
+                    <td className="p-3 text-right text-emerald-400">{r.wins}</td>
+                    <td className="p-3 text-right text-rose-400">{r.losses}</td>
+                    <td className="p-3 text-right">{done > 0 ? `${Math.round((r.wins / done) * 100)}%` : '—'}</td>
+                    <td className="p-3 text-right text-muted">{r.open_count}</td>
+                    <td className="p-3 text-right">{r.net_latam > 0 ? '+' : ''}{r.net_latam}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <AdSlot slot={ADSENSE.slotRanking} />
     </div>
   );
 }

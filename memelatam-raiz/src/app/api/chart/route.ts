@@ -1,26 +1,25 @@
 import { NextResponse } from 'next/server';
 import { isSupportedChain } from '@/lib/chains';
-import { getChartData, isTimeframe } from '@/lib/services/chart';
+import { detectAddressKind } from '@/lib/addresses';
+import { getCandles, isTimeframe } from '@/lib/services/chart';
 
 export const dynamic = 'force-dynamic';
+const POOL_RE = /^[A-Za-z0-9]{20,70}$/;
 
-// Direcciones de pool/token: letras y números (EVM 0x…, hash de 66 chars en Uniswap v4, base58 en Solana).
-const ADDR = /^[A-Za-z0-9]{20,100}$/;
-
+/** GET /api/chart?chain=&pair=&token=&tf=1m&limit=200 → { candles } (ascendente por tiempo). */
 export async function GET(req: Request) {
   const q = new URL(req.url).searchParams;
   const chain = q.get('chain') ?? '';
-  const pool = q.get('pool') ?? '';
+  const pair = q.get('pair') ?? '';
   const token = q.get('token') ?? '';
-  const tf = q.get('tf') ?? '15m';
-  if (!isSupportedChain(chain) || !ADDR.test(pool) || !ADDR.test(token) || !isTimeframe(tf)) {
+  const tf = q.get('tf') ?? '1m';
+  const limit = Math.min(500, Math.max(1, Number(q.get('limit') ?? 200) || 200));
+  if (!isSupportedChain(chain) || !POOL_RE.test(pair) || !detectAddressKind(token) || !isTimeframe(tf))
     return NextResponse.json({ error: 'bad_request' }, { status: 400 });
-  }
   try {
-    const data = await getChartData(chain, pool, token, tf);
-    if (!data) return NextResponse.json({ error: 'no_data' }, { status: 404 });
-    return NextResponse.json(data, { headers: { 'Cache-Control': 'public, s-maxage=15, stale-while-revalidate=60' } });
+    const candles = await getCandles(chain, pair, token, tf, limit);
+    return NextResponse.json({ candles }, { headers: { 'Cache-Control': 'public, s-maxage=3, stale-while-revalidate=8' } });
   } catch {
-    return NextResponse.json({ error: 'unavailable' }, { status: 502 });
+    return NextResponse.json({ error: 'upstream' }, { status: 502 });
   }
 }

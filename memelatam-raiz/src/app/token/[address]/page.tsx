@@ -1,13 +1,15 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AlertTriangle, CheckCircle2, Info, ShieldAlert } from 'lucide-react';
-import { AdSlot } from '@/components/ads/AdSlot';
 import { SearchBar } from '@/components/search/SearchBar';
 import { TokenAvatar } from '@/components/token/TokenCard';
-import { LiveMarketProvider, LivePrice, LiveStats } from '@/components/token/LiveMarket';
+import { AdSlot } from '@/components/ads/AdSlot';
+import { ChartPanel } from '@/components/token/ChartPanel';
+import { LivePrice, LiveStats } from '@/components/token/LiveMarketViews';
+import { LiveTokenProvider } from '@/components/token/LiveTokenProvider';
+import { PredictionBox } from '@/components/token/PredictionBox';
+import { TopTraders } from '@/components/token/TopTraders';
 import { HolderTable } from '@/components/token/HolderTable';
-import { ContractChip } from '@/components/token/ContractChip';
-import { PriceChart } from '@/components/token/PriceChart';
 import { NewsFeed } from '@/components/token/NewsFeed';
 import { ThesisSection } from '@/components/token/ThesisSection';
 import { JoinCommunityButton } from '@/components/community/JoinCommunityButton';
@@ -19,7 +21,9 @@ import { chainLabel } from '@/lib/chains';
 import { MOCK_THESES } from '@/lib/mock';
 import { getActiveBoosts, getCommunityPeople, getFollowedWallets, getFollowingIds, getRole, getTheses, getTokenCommunity } from '@/lib/services/community';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
-import { SITE } from '@/lib/config';
+import { ADSENSE, SITE } from '@/lib/config';
+import { pairToLive } from '@/lib/live';
+import { getMyPredictions, getPredictionStats, type MyPrediction } from '@/lib/services/predictions';
 import { getTokenFull } from '@/lib/services/token';
 import { cn } from '@/lib/utils';
 import type { RiskFlag } from '@/types/token';
@@ -92,9 +96,13 @@ export default async function TokenPage({ params, searchParams }: Props) {
   ]);
   const role = me && community ? await getRole(community.id, me.id) : null;
   const people = community ? await getCommunityPeople(community.id) : [];
+  const [predStats, myPreds] = await Promise.all([
+    demo ? Promise.resolve({ vive: 0, muere: 0 }) : getPredictionStats(key),
+    me && !demo ? getMyPredictions(me.id, key) : Promise.resolve([] as MyPrediction[]),
+  ]);
 
   return (
-    <LiveMarketProvider initial={p} chain={t.chain} token={t.address}>
+    <LiveTokenProvider initial={pairToLive(p)} chain={t.chain} address={t.address}>
     <div className="space-y-6">
       {/* Encabezado */}
       <header className="flex flex-wrap items-center gap-4">
@@ -108,7 +116,6 @@ export default async function TokenPage({ params, searchParams }: Props) {
             <RiskBadge level={t.risk.level} score={t.risk.score} />
             <ActivityBadge status={t.activity.status} />
           </div>
-          <ContractChip chain={t.chain} address={t.address} />
         </div>
         <LivePrice />
       </header>
@@ -138,13 +145,6 @@ export default async function TokenPage({ params, searchParams }: Props) {
         />
       </section>
 
-      <p className="text-sm text-muted">
-        ¿Crees que {t.symbol} va a durar? <Link href={`/predicciones?token=${t.address}&chain=${t.chain}`} className="text-brand hover:underline">Haz tu predicción y gana $LATAM si aciertas →</Link>
-      </p>
-
-      {/* Anuncio: justo después de la acción principal y antes del análisis largo; no interrumpe ningún dato. */}
-      <AdSlot slot="token" minHeight={120} />
-
       {!demo && (
         <BoostButton chain={t.chain} address={t.address} symbol={t.symbol} activeTotal={boosts[key] ?? 0} loggedIn={!!me} />
       )}
@@ -156,18 +156,12 @@ export default async function TokenPage({ params, searchParams }: Props) {
         />
       )}
 
-      <LiveStats totalHolders={t.holders?.totalHolders ?? null} />
+      <LiveStats dex={p.dexId} totalHolders={t.holders?.totalHolders ?? null} />
 
-      {/* Gráfico propio: velas + compras/ventas reales del pool dibujadas como burbujas */}
-      <PriceChart
-        chain={t.chain}
-        pool={p.pairAddress}
-        token={t.address}
-        symbol={t.symbol}
-        holderAddresses={t.holders?.holders.map((h) => h.address) ?? []}
-        totalHolders={t.holders?.totalHolders ?? null}
-        advancedSrc={`https://dexscreener.com/${p.chainId}/${p.pairAddress}?embed=1&theme=dark&trades=0&info=0&interval=1`}
-      />
+      {/* Gráfico de velas en vivo (con DexScreener como respaldo) */}
+      <ChartPanel chain={p.chainId} pairAddress={p.pairAddress} tokenAddress={t.address} symbol={t.symbol} />
+
+      <PredictionBox chain={t.chain} address={t.address} symbol={t.symbol} loggedIn={!!me} demo={demo} stats={predStats} mine={myPreds} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title="Riesgo y señales">
@@ -193,6 +187,12 @@ export default async function TokenPage({ params, searchParams }: Props) {
         </Section>
       </div>
 
+      <Section title="Traders más movidos">
+        <TopTraders chain={t.chain} pairAddress={p.pairAddress} loggedIn={!!me} followed={followedWallets} canFollow={!demo} />
+      </Section>
+
+      <AdSlot slot={ADSENSE.slotToken} />
+
       <div className="grid gap-6 lg:grid-cols-2">
         <Section title={t.activity.status === 'fantasma' ? 'Actividad: token fantasma' : 'Actividad y noticias'}>
           <ul className="mb-4 list-disc space-y-1 pl-5 text-sm text-muted">
@@ -211,6 +211,6 @@ export default async function TokenPage({ params, searchParams }: Props) {
         <a href={p.url} target="_blank" rel="noopener noreferrer" className="underline hover:text-brand">Ver en DexScreener</a>
       </p>
     </div>
-    </LiveMarketProvider>
+    </LiveTokenProvider>
   );
 }

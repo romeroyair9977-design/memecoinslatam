@@ -1,11 +1,11 @@
 import Link from 'next/link';
-import { AdSlot } from '@/components/ads/AdSlot';
 import { ActivityFeed } from '@/components/activity/ActivityFeed';
 import { CommunityList } from '@/components/community/parts';
 import { SearchBar } from '@/components/search/SearchBar';
+import { AdSlot } from '@/components/ads/AdSlot';
+import { ADSENSE } from '@/lib/config';
 import { LiveDashboard } from '@/components/dashboard/LiveDashboard';
 import { MOCK_ACTIVITY, MOCK_MESSAGES, MOCK_TOP_COMMUNITIES } from '@/lib/mock';
-import { withTimeout } from '@/lib/cache';
 import { getDashboard } from '@/lib/services/dashboard';
 import { getActiveBoosts, getActivity, getGeneralCommunity, getMemberCounts, getMessages, getTopCommunities } from '@/lib/services/community';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
@@ -16,7 +16,7 @@ export const revalidate = 20;
 
 export default async function HomePage() {
   // Si las APIs fallan, la home sigue cargando con columnas vacías.
-  const dash = await withTimeout(getDashboard(), 4_000, null);
+  const dash = await getDashboard().catch(() => null);
   const demo = !isSupabaseConfigured;
 
   // Todo lo social usa el cliente público (sin cookies) para que la home siga siendo ISR.
@@ -37,15 +37,14 @@ export default async function HomePage() {
           Antes de comprar, mira quién tiene los tokens
         </h1>
         <p className="mx-auto mt-3 max-w-xl text-muted">
-          Pega un contract address y revisa liquidez, concentración de holders y señales de rug. Luego discute tu tesis con la comunidad latina, mira el <Link href="/ranking" className="text-brand hover:underline">ranking de memecoins</Link> y compite en <Link href="/predicciones" className="text-brand hover:underline">predicciones</Link>.
+          Pega un contract address y revisa liquidez, concentración de holders y señales de rug. Luego discute tu tesis con la comunidad latina.
         </p>
         <div className="mt-6"><SearchBar /></div>
       </section>
 
       <LiveDashboard initial={dash} memberCounts={demo ? undefined : memberCounts} boosts={demo ? undefined : boosts} />
 
-      {/* Anuncio 1: entre el dashboard y la comunidad. Es el punto con más atención y no tapa ninguna columna. */}
-      <AdSlot slot="home" minHeight={120} />
+      <AdSlot slot={ADSENSE.slotHome} />
 
       <section id="comunidad" className="scroll-mt-20 grid gap-6 lg:grid-cols-3">
         <div className="space-y-3 lg:col-span-2">
@@ -68,8 +67,6 @@ export default async function HomePage() {
           <Link href="/comunidad" className="inline-block rounded-lg bg-brand px-4 py-2 text-sm font-medium text-bg hover:bg-brand-dim">Unirme a la conversación</Link>
         </div>
         <aside className="space-y-4">
-          {/* Anuncio 2: columna lateral, debajo del fold en móvil. */}
-          <AdSlot slot="sidebar" format="rectangle" minHeight={250} />
           <CommunityList communities={top} title="Comunidades más activas" />
           <section className="rounded-xl border border-line bg-panel/50 p-4">
             <h2 className="mb-3 font-display text-base font-semibold">Actividad</h2>

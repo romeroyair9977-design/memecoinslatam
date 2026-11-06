@@ -9,7 +9,6 @@ import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { createServerSupabase } from '@/lib/supabase/server';
 import { cn, formatAge, shortAddress } from '@/lib/utils';
 import { formatLatam, LATAM, POINT_REASONS } from '@/lib/latam';
-import { SITE } from '@/lib/config';
 import type { PointTx } from '@/types/community';
 
 export const dynamic = 'force-dynamic';
@@ -21,7 +20,7 @@ const STANCE = {
 } as const;
 
 export async function generateMetadata({ params }: { params: { username: string } }): Promise<Metadata> {
-  return { title: `@${params.username}`, description: `Perfil de @${params.username} en ${SITE.name}: tesis y actividad.` };
+  return { title: `@${params.username}`, description: `Perfil de @${params.username} en MemeLatam: tesis y actividad.` };
 }
 
 export default async function ProfilePage({ params }: { params: { username: string } }) {

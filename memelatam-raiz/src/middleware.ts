@@ -7,6 +7,9 @@ export async function middleware(request: NextRequest) {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !key) return NextResponse.next({ request });
 
+  // Visitantes sin sesión (la mayoría): no hay nada que refrescar → cero llamadas a Supabase y respuesta inmediata.
+  if (!request.cookies.getAll().some((c) => c.name.startsWith('sb-'))) return NextResponse.next({ request });
+
   let response = NextResponse.next({ request });
   const supabase = createServerClient(url, key, {
     cookies: {
@@ -24,5 +27,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   // Todo menos estáticos e imágenes. La home (ISR) y el token no necesitan sesión, pero es barato.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  // Se excluyen las APIs de datos (se consultan cada pocos segundos y no usan sesión) y ads.txt.
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|ads.txt|api/prices|api/chart|api/traders|api/dashboard|api/token|api/cron|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };

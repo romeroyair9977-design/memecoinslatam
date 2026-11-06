@@ -1,4 +1,4 @@
-# Veltrix Coin (MVP) · por Veltrix Colombia
+# MemeLatam (MVP)
 
 Plataforma en español para la comunidad latina de memecoins: buscador por contract address, análisis de
 holders y riesgo, dashboard (Recién lanzadas / Con tracción / Migrando), **comunidades en tiempo real**
@@ -32,19 +32,14 @@ ejemplo y la escritura está deshabilitada.
 ## Rutas
 | Ruta | Qué es |
 |---|---|
-| `/` | Ticker + dashboard de 3 columnas que se actualiza solo cada 20 s + filtros avanzados + comunidad y actividad |
-| `/api/dashboard` | JSON con todos los tokens enriquecidos (cache 20 s + stale-while-revalidate). Lo consulta el navegador para refrescar |
+| `/` | Ticker + dashboard de 3 columnas que se actualiza solo cada 30 s + filtros avanzados + comunidad y actividad |
+| `/api/dashboard` | JSON con todos los tokens enriquecidos (cache 30 s). Lo consulta el navegador para refrescar |
 | `/token/[address]?chain=` | Análisis: mercado, holders, riesgo, tesis, botón de comunidad |
 | `/comunidad` | Comunidad General: canales General · Señales · Rugs · Nuevas |
 | `/comunidad/[chain]/[address]` | Comunidad del token: Chat y Posts |
 | `/actividad` | Feed en vivo (Todo / Siguiendo) |
 | `/perfil/[usuario]` | Perfil, seguir, wallets seguidas (privadas), tesis |
-| `/tendencias` | Memecoins más mencionadas en X (1h / 6h / 24h), con filtros y enlace al análisis. Requiere `X_BEARER_TOKEN` |
-| `/ranking` | 4 rankings de memecoins: más sonadas, nuevas con FOMO, más volumen, clásicas (se renueva cada hora) |
-| `/predicciones` | Apuesta cuánto va a perdurar una memecoin; ranking de los que más aciertan por categoría |
-| `/wallets` | Wallets que aparecen en varias memecoins calientes, más guardadas, y tus wallets (agrega las tuyas) |
-| `/privacidad` | Política de privacidad y publicidad (la pide AdSense) |
-| `/login` | Google, código al correo, contraseña o wallet (Solana / EVM) |
+| `/login` | Wallet (Solana / EVM) o enlace por correo |
 | `/admin/reportes` | Cola de moderación (admins y mods) |
 
 ## Dashboard y filtros
@@ -55,7 +50,7 @@ ejemplo y la escritura está deshabilitada.
   <30 % migrando) y se puede volver filtro duro desde el panel. Si el dato no existe, el token no se excluye.
 - El servidor devuelve todos los tokens y el **navegador** los reparte en columnas; por eso el panel responde
   al instante. Los filtros del usuario se guardan en `localStorage`.
-- Las memecoins nuevas entran solas: el cliente consulta `/api/dashboard` cada 20 s (pausa con la pestaña oculta)
+- Las memecoins nuevas entran solas: el cliente consulta `/api/dashboard` cada 30 s (pausa con la pestaña oculta)
   y marca con “Nuevo” las que aparecen.
 - La barra de búsqueda se vacía al enviar.
 
@@ -110,62 +105,60 @@ Token interno de la plataforma. **El balance nunca lo toca el navegador**: solo 
 - Login: wallet (Solana/EVM), enlace mágico y correo + contraseña. En **Authentication → Providers → Email** decide si exiges confirmar el correo.
 - Darte $LATAM para probar: `select public.award_points((select id from public.profiles where username='tu_usuario'), 500, 'invitacion', null);`
 
+---
 
-## Fase 3 (esta versión)
+# Fase 3 — guía de configuración
 
-### Dominio y marca
-- Marca madre: **Veltrix Colombia** (`veltrixcolombia.com`). Esta plataforma: **Veltrix Coin**, pensada como subdominio
-  (`memecoin.veltrixcolombia.com`). Todo sale de `src/lib/config.ts` y de dos variables: `NEXT_PUBLIC_SITE_URL`
-  y `NEXT_PUBLIC_PARENT_URL`. **Si cambias de dominio solo cambias esas variables en el hosting** y vuelves a desplegar
-  (y en Supabase actualizas Site URL y Redirect URLs).
-- Subdominio: en el DNS de `veltrixcolombia.com` crea un `CNAME` `memecoin` → el host que te dé tu hosting.
+## 1. Base de datos (Supabase → SQL Editor, en este orden)
+Ya corriste `0001` y `0002`. Ahora ejecuta:
+1. `supabase/migrations/0003_predicciones.sql` — premios de $LATAM más bajos, predicciones de permanencia y ranking.
+2. `supabase/migrations/0004_tendencias_x.sql` — tablas y funciones de "Tendencias en X".
 
-### Anuncios (Google AdSense)
-- El script de AdSense se carga **una sola vez** en `src/app/layout.tsx` (con `next/script`, después de que la página ya es
-  interactiva, así no frena nada). `public/ads.txt` ya tiene tu publisher ID.
-- Espacios (`<AdSlot slot="..."/>`): `home` (entre el dashboard y la comunidad), `sidebar` (lateral de la home),
-  `token` (página del token, después de la acción principal), `ranking` (ranking, predicciones y wallets, entre secciones).
-  Nunca tapan botones, tarjetas ni el chat y reservan su alto para no mover el contenido.
-- **Falta un paso tuyo:** en AdSense crea 4 bloques de anuncio (Anuncios → Por unidad de anuncio → Display adaptable) y pon sus
-  IDs en `NEXT_PUBLIC_AD_SLOT_HOME`, `_SIDEBAR`, `_TOKEN`, `_RANKING`. Sin ID, ese espacio no se muestra. También puedes activar
-  "Anuncios automáticos" en el panel de AdSense.
-- AdSense exige política de privacidad: ya está en `/privacidad` y enlazada en el pie.
+## 2. Variables de entorno (Netlify → Project configuration → Environment variables)
+| Variable | Para qué |
+|---|---|
+| `TWITTERAPI_IO_KEY` | Key de twitterapi.io. **Solo servidor.** Regenérala si la compartiste en algún chat |
+| `CRON_SECRET` | Cadena larga y aleatoria que protege los endpoints de cron |
+| `X_MAX_PAGES` | `1` (recomendado). Páginas por consulta en cada escaneo |
+| `DEEPL_API_KEY` | Opcional. Traduce tweets al español (DeepL gratis). Sin ella se ofrece enlace a Google Traductor |
+| `NEXT_PUBLIC_ADSENSE_SLOT_HOME` / `_TOKEN` / `_RANKING` | IDs de bloque de AdSense (ver punto 4) |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | Opcional: correo de contacto en la política de privacidad |
+| `NEXT_PUBLIC_SITE_URL` | Tu URL final (p. ej. `https://memecoin.veltrixcolombia.com`) |
 
-### Velocidad en tiempo real
-- Cache con *stale-while-revalidate* (`lib/cache.ts`): el usuario recibe al instante el último dato y se recalcula en segundo plano.
-- Las fuentes externas tienen tiempo límite individual: una API lenta ya no frena a las demás.
-- RugCheck (lo más lento) ya no bloquea la respuesta: el top 10 se completa solo en los refrescos siguientes.
-- El navegador pide dashboard y boosts en paralelo y refresca cada 20 s.
-- Más candidatos: pools con más volumen de Solana y Base (si no, "Migrando" casi nunca tenía datos con filtros altos).
+> Las variables `NEXT_PUBLIC_*` se incorporan **en el build**: después de cambiarlas hay que redesplegar.
 
-### Filtros
-- El panel ahora edita un borrador y tiene el botón **Buscar · N resultados** (fijo abajo). Muestra cuántos resultados da cada columna
-  antes de aplicar y avisa si no sale ninguno.
+## 3. Crons gratuitos (cron-job.org u otro)
+Crea dos tareas HTTP GET con la cabecera `Authorization: Bearer TU_CRON_SECRET`:
 
-### Login
-- **Google**, **código al correo** (recomendado: sin contraseña), contraseña y wallet. Configuración en Supabase:
-  1. *Authentication → Providers → Google*: activa y pega el Client ID/Secret de Google Cloud (OAuth, tipo "Web"). En Google Cloud
-     añade como redirect URI la que te muestra Supabase (`https://<proyecto>.supabase.co/auth/v1/callback`).
-  2. *Authentication → Email Templates → Magic Link* (y *Confirm signup*): incluye `{{ .Token }}` en el cuerpo para que llegue el código,
-     por ejemplo: `Tu código de Veltrix Coin: {{ .Token }}`.
-  3. *Authentication → Providers → Email → Email OTP Length*: 6 (o el número que prefieras; la app acepta de 6 a 10).
-  4. **Correo propio (SMTP):** el correo integrado de Supabase está limitado a unas pocas por hora y es solo para pruebas.
-     Antes de lanzar configura SMTP propio (Resend, Brevo, Gmail SMTP…) en *Project Settings → Authentication → SMTP*.
+| URL | Frecuencia | Qué hace |
+|---|---|---|
+| `https://TU-DOMINIO/api/cron/x-scan` | cada 30 min | Guarda las menciones nuevas de X |
+| `https://TU-DOMINIO/api/cron/resolve-predictions` | 1 vez al día | Resuelve predicciones vencidas y paga $LATAM |
 
-### Recompensas $LATAM (más bajas)
-Migración `0003_predicciones.sql`: bienvenida **5** (antes 20), tesis **3** (3/día), comunidad **10** (2/día), reacción **1** (10/día).
+**Costo de X:** twitterapi.io cobra ≈ 0,00015 USD por tweet devuelto. Con 3 consultas × 1 página (~20 tweets) son ≤ 60 tweets por corrida ≈ 0,009 USD; cada 30 min ≈ 0,43 USD/día (≈ 13 USD/mes) como máximo. La respuesta del cron incluye `estimatedCostUsd` para que lo vigiles. Las consultas se editan en `src/lib/xmentions.ts` (`X_QUERIES`).
 
-### Predicciones y ranking de aciertos
-- Migración `supabase/migrations/0003_predicciones.sql` (ejecútala después de 0001 y 0002).
-- Predices que una memecoin seguirá **viva** (o **muerta**) en 1 semana / 1 mes / 3 meses / 6 meses, por categoría (general, IA, animales,
-  celebridades). Premio al acertar: 2 / 6 / 15 / 30 $LATAM (apostar a que muere paga la mitad). Máx. 5 por día, una por token, solo
-  tokens con ≥ $10K de liquidez. "Viva" = liquidez ≥ $5K y volumen 24 h ≥ $1K al vencer.
-- Se resuelven solas al abrir `/predicciones`; opcional: un cron diario a `GET /api/cron/predicciones` con `Authorization: Bearer $CRON_SECRET`.
-- Los montos/umbrales viven en el SQL y en `src/lib/predictions.ts` (mantén ambos iguales).
+**Límites honestos:** es una *muestra* de menciones (consultas con `min_faves`), no el 100 % de X. Algunos proveedores reportan que la paginación por cursor falla a veces; por eso el diseño usa ventanas de tiempo (`since_time`/`until_time`) y una sola página por consulta.
 
-### Wallets
-- `/wallets`: "Wallets en movimiento" = wallets de Solana entre los mayores holders de **varias** memecoins calientes (sin pools). Guardar con un
-  clic y agregar cualquier wallet a mano. **No se muestran ganancias**: no hay una fuente gratuita y verificable de PnL; mostrar "mejores traders"
-  inventados sería engañar al usuario.
-- Cambio importante: la lista de holders ahora usa la wallet dueña (`owner` de RugCheck) y no la cuenta de token, para que lo que se guarda sea
-  una wallet real.
+## 4. Anuncios (Google AdSense)
+1. En AdSense agrega tu sitio y espera la aprobación (el script y `public/ads.txt` ya están puestos; la política de privacidad está en `/privacidad`).
+2. Anuncios → **Por bloque de anuncios** → crea 3 bloques de *display* responsivo: Home, Token y Ranking. Copia el número de cada uno (`data-ad-slot`) a las variables `NEXT_PUBLIC_ADSENSE_SLOT_*`.
+3. Ubicaciones (a propósito pocas): debajo de las columnas del dashboard, entre los traders y el análisis en la página de token, y al final del ranking. **No hay anuncios** en chats, login ni cerca de botones de acción.
+4. Si prefieres que Google los coloque solo, activa *Anuncios automáticos* en AdSense; conviven con estos bloques.
+5. Si tienes visitantes del Espacio Económico Europeo o Reino Unido necesitas además un banner de consentimiento (CMP) certificado por Google.
+
+## 5. Login con código por correo y con Google
+- **Código por correo:** en Supabase → Authentication → **Email Templates**, edita las plantillas **Magic Link** *y* **Confirm signup** para incluir el código: `Tu código es: {{ .Token }}`. (Las cuentas nuevas reciben la plantilla *Confirm signup*, las existentes la *Magic Link*.)
+- **Correos que sí llegan:** el servidor de correo integrado de Supabase está pensado para pruebas y tiene límites muy bajos. Para producción configura SMTP propio en Authentication → SMTP Settings (Resend, Brevo, etc.).
+- **Google:** Google Cloud Console → Credenciales → ID de cliente OAuth (aplicación web). En *URI de redireccionamiento autorizados* pon `https://TU-PROYECTO.supabase.co/auth/v1/callback`. Pega Client ID y Secret en Supabase → Authentication → Providers → **Google** y actívalo.
+
+## 6. Subdominio `memecoin.veltrixcolombia.com`
+1. Netlify → Domain management → *Add domain alias* → `memecoin.veltrixcolombia.com`.
+2. Namecheap → Advanced DNS → CNAME, Host `memecoin`, Value `memelatam-raiz.netlify.app` (sin `https://` ni `/`).
+3. Cambia `NEXT_PUBLIC_SITE_URL` y las *Redirect URLs* de Supabase al nuevo dominio. Redespliega.
+4. Si más adelante cambias de dominio principal, la marca madre se edita en `src/lib/config.ts` (`PARENT`).
+
+## 7. Qué cambió en velocidad
+- Un endpoint liviano (`/api/prices`) refresca precios y números de las cards cada 6 s; la lista completa, cada 20 s.
+- La página de token se actualiza cada 4 s y su gráfico de velas se mueve con el precio en vivo.
+- El middleware ya no consulta a Supabase en cada visita de usuarios sin sesión, ni en las APIs de datos.
+- Cada fuente externa tiene tope de 4 s: una lenta ya no frena todo el dashboard.
