@@ -8,6 +8,7 @@ const NAV = [
   { href: '/#dashboard', label: 'Dashboard' },
   { href: '/scan', label: 'Scan' },
   { href: '/ballenas', label: 'Ballenas' },
+  { href: '/potencial', label: 'Potencial' },
   { href: '/comunidad', label: 'Comunidad' },
   { href: '/ranking', label: 'Predictores' },
   { href: '/actividad', label: 'Actividad' },
@@ -23,7 +24,7 @@ export function Header() {
         </div>
         <nav aria-label="Principal" className="hidden items-center gap-4 text-sm text-muted sm:flex">
           {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className="hover:text-ink">{n.label}</Link>
+            <Link key={n.href} href={n.href} className="whitespace-nowrap hover:text-ink">{n.label}</Link>
           ))}
         </nav>
         <div className="ml-auto hidden w-full max-w-md md:block">
@@ -35,7 +36,7 @@ export function Header() {
       <div className="space-y-2 border-t border-line px-4 py-2 md:hidden">
         <nav aria-label="Principal (móvil)" className="flex gap-4 overflow-x-auto whitespace-nowrap text-sm text-muted sm:hidden">
           {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className="hover:text-ink">{n.label}</Link>
+            <Link key={n.href} href={n.href} className="whitespace-nowrap hover:text-ink">{n.label}</Link>
           ))}
         </nav>
         <SearchBar size="sm" />

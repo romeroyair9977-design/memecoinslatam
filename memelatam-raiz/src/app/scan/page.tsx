@@ -56,6 +56,7 @@ export default async function ScanPage() {
           {data && <> Última actualización {formatAge(data.updatedAt)}.</>}
         </p>
         <p className="flex flex-wrap gap-2 pt-1 text-sm">
+          <Link href="/potencial" className="rounded-full border border-brand/40 bg-brand/10 px-3 py-1 text-brand hover:bg-brand/20">🎯 Radar x10 · x100 · x1000</Link>
           <Link href="/ballenas" className="rounded-full border border-line px-3 py-1 text-muted hover:text-ink">🐋 Ballenas en movimiento</Link>
           <Link href="/tendencias-x" className="rounded-full border border-line px-3 py-1 text-muted hover:text-ink">𝕏 Tendencias en X</Link>
           <Link href="/ranking" className="rounded-full border border-line px-3 py-1 text-muted hover:text-ink">🏆 Ranking de predictores</Link>
