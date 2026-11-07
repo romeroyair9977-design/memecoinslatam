@@ -128,13 +128,12 @@ Ya corriste `0001` y `0002`. Ahora ejecuta:
 > Las variables `NEXT_PUBLIC_*` se incorporan **en el build**: después de cambiarlas hay que redesplegar.
 
 ## 3. Crons gratuitos (cron-job.org u otro)
-Crea tres tareas HTTP GET con la cabecera `Authorization: Bearer TU_CRON_SECRET`:
+Crea dos tareas HTTP GET con la cabecera `Authorization: Bearer TU_CRON_SECRET`:
 
 | URL | Frecuencia | Qué hace |
 |---|---|---|
 | `https://TU-DOMINIO/api/cron/x-scan` | cada 30 min | Guarda las menciones nuevas de X |
 | `https://TU-DOMINIO/api/cron/resolve-predictions` | 1 vez al día | Resuelve predicciones vencidas y paga $LATAM |
-| `https://TU-DOMINIO/api/cron/scan-calls` | cada 30 min | Radar x10/x100/x1000: registra candidatas y revisa si llegaron a su meta (requiere `supabase/migrations/0005_scan_calls.sql`) |
 
 **Costo de X:** twitterapi.io cobra ≈ 0,00015 USD por tweet devuelto. Con 3 consultas × 1 página (~20 tweets) son ≤ 60 tweets por corrida ≈ 0,009 USD; cada 30 min ≈ 0,43 USD/día (≈ 13 USD/mes) como máximo. La respuesta del cron incluye `estimatedCostUsd` para que lo vigiles. Las consultas se editan en `src/lib/xmentions.ts` (`X_QUERIES`).
 

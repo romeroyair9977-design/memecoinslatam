@@ -2,17 +2,7 @@ import Link from 'next/link';
 import { PARENT, SITE } from '@/lib/config';
 import { SearchBar } from '@/components/search/SearchBar';
 import { UserMenu } from '@/components/auth/UserMenu';
-
-const NAV = [
-  { href: '/tendencias-x', label: 'Tendencias en X' },
-  { href: '/#dashboard', label: 'Dashboard' },
-  { href: '/scan', label: 'Scan' },
-  { href: '/ballenas', label: 'Ballenas' },
-  { href: '/potencial', label: 'Potencial' },
-  { href: '/comunidad', label: 'Comunidad' },
-  { href: '/ranking', label: 'Predictores' },
-  { href: '/actividad', label: 'Actividad' },
-];
+import { MainNav } from '@/components/layout/MainNav';
 
 export function Header() {
   return (
@@ -22,11 +12,7 @@ export function Header() {
           <Link href="/" className="font-display text-xl font-bold tracking-tight">{SITE.name}</Link>
           <a href={PARENT.url} className="mt-0.5 hidden text-[10px] text-muted hover:text-ink sm:block">por {PARENT.name}</a>
         </div>
-        <nav aria-label="Principal" className="hidden items-center gap-4 text-sm text-muted sm:flex">
-          {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className="whitespace-nowrap hover:text-ink">{n.label}</Link>
-          ))}
-        </nav>
+        <MainNav label="Principal" className="hidden items-center gap-4 text-sm text-muted sm:flex" />
         <div className="ml-auto hidden w-full max-w-md md:block">
           <SearchBar size="sm" />
         </div>
@@ -34,11 +20,7 @@ export function Header() {
       </div>
       {/* Móvil: la navegación y el buscador viven en una segunda fila */}
       <div className="space-y-2 border-t border-line px-4 py-2 md:hidden">
-        <nav aria-label="Principal (móvil)" className="flex gap-4 overflow-x-auto whitespace-nowrap text-sm text-muted sm:hidden">
-          {NAV.map((n) => (
-            <Link key={n.href} href={n.href} className="whitespace-nowrap hover:text-ink">{n.label}</Link>
-          ))}
-        </nav>
+        <MainNav label="Principal (móvil)" className="flex items-center gap-4 text-sm text-muted sm:hidden" />
         <SearchBar size="sm" />
       </div>
     </header>
