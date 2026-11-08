@@ -28,5 +28,5 @@ export async function middleware(request: NextRequest) {
 export const config = {
   // Todo menos estáticos e imágenes. La home (ISR) y el token no necesitan sesión, pero es barato.
   // Se excluyen las APIs de datos (se consultan cada pocos segundos y no usan sesión) y ads.txt.
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|ads.txt|api/prices|api/chart|api/traders|api/dashboard|api/token|api/cron|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|ads.txt|api/prices|api/chart|api/traders|api/dashboard|api/token|api/cron|api/x-trends|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 };

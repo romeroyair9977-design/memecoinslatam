@@ -71,8 +71,8 @@ async function mapPool<T, R>(items: T[], size: number, fn: (x: T) => Promise<R>)
 }
 
 /** Ranking de menciones en X para una ventana (1, 6 o 24 horas), ya enlazado a tokens reales. Cache 60 s. */
-export async function getXTrends(hours: 1 | 6 | 24): Promise<XTrendsResult> {
-  return cached(`xtrends:${hours}`, 60_000, async () => {
+export async function getXTrends(hours: 1 | 6 | 24, fresh = false): Promise<XTrendsResult> {
+  return cached(fresh ? `xtrends:${hours}:fresh` : `xtrends:${hours}`, fresh ? 1_000 : 60_000, async () => {
     const sb = createPublicSupabase();
     if (!sb) throw new Error('Supabase no configurado');
 

@@ -16,6 +16,7 @@ interface RawReport {
   totalHolders?: number;
   mintAuthority?: string | null;
   freezeAuthority?: string | null;
+  creator?: string | null;
   topHolders?: { address: string; owner?: string; amount?: number; pct: number; insider?: boolean }[];
   /** Pools del token: sus cuentas (vaults/LP) NO son holders reales y inflan la concentración. */
   markets?: { pubkey?: string; liquidityA?: string; liquidityB?: string; lp?: { lpLockedPct?: number } & Record<string, unknown> }[];
@@ -45,7 +46,9 @@ export async function getRugCheckOverview(mint: string): Promise<RugCheckOvervie
         pct: h.pct, // RugCheck devuelve porcentaje (p.ej. 12.3 = 12.3%)
         amount: h.amount,
         isInsider: h.insider,
+        owner: h.owner,
       }));
+      const creatorHolding = r.creator ? holders.find((h) => h.owner === r.creator || h.address === r.creator) : undefined;
       const top10Pct = holders.slice(0, 10).reduce((sum, h) => sum + h.pct, 0);
 
       return {
@@ -60,6 +63,8 @@ export async function getRugCheckOverview(mint: string): Promise<RugCheckOvervie
           rugged: Boolean(r.rugged),
           mintAuthorityActive: Boolean(r.mintAuthority),
           freezeAuthorityActive: Boolean(r.freezeAuthority),
+          creator: r.creator ?? null,
+          creatorHoldingPct: creatorHolding ? creatorHolding.pct : null,
           dangerRisks: (r.risks ?? [])
             .filter((x) => x.level === 'danger')
             .map((x) => x.description ?? x.name),

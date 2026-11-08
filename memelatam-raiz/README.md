@@ -190,3 +190,43 @@ Cada token muestra el market cap necesario y la compra neta aproximada para cada
 - Los llamados son escenarios, no predicciones: la mayoría de las memecoins pierde valor y un x1000 es rarísimo.
 - El pico se mide en cada corrida del cron; un salto más corto que el intervalo puede no registrarse.
 - Ballenas: RugCheck no cubre EVM; el valor usa market cap × % del supply (ignora tokens bloqueados/quemados).
+
+---
+
+# Fase 3d — Contrato visible, "¿Quién está detrás?" y Tendencias en X que se actualizan solas
+
+## Contrato visible
+Cada token muestra su contrato completo bajo el nombre, con botones para copiar y abrir en el explorador (`ContractLine`).
+
+## ¿Quién está detrás? (en cada token)
+Veltrix **no puede confirmar identidades reales**; reúne señales públicas y verificables y da un veredicto:
+- **Cuenta de X** del token (de DexScreener/GeckoTerminal): existe, antigüedad, seguidores, marca de verificación.
+- **¿La cuenta publicó este contrato?** Búsqueda `from:@cuenta "contrato"` (la señal más fuerte contra imitaciones).
+- **¿El perfil enlaza al mismo sitio web que el token?**
+- **Wallet creadora** y cuánto del supply aún tiene (RugCheck, Solana).
+- **Tokens con el mismo nombre o símbolo** en todas las redes, con liquidez, edad y si tienen redes → detecta imitaciones (p. ej. otro "FLOAT" que no es el equipo real).
+- Veredictos: *Equipo con señales verificables · Equipo sin verificar · Sin equipo visible · Posible imitación* (si existe un token igual, más viejo y con ≥ 2× la liquidez, y este contrato no está respaldado por la cuenta de X).
+
+Costo: ≈ 0,0003 USD por informe (un perfil + una búsqueda), con cache de 6 h por token. Sin `TWITTERAPI_IO_KEY` el informe sigue funcionando, solo sin la parte de X.
+
+## Tendencias en X: qué cambió
+- **Se actualiza sola.** Si los datos tienen más de 30 min, la página pide una actualización (`POST /api/x-trends/refresh`). Un candado en Postgres permite **un escaneo cada 30 min** (`X_REFRESH_MIN`) para todos los visitantes juntos. El cron externo pasa a ser opcional.
+- **Ventanas cortas.** La búsqueda de twitterapi.io devuelve ~7–20 tweets por consulta y su paginación está rota, así que cada escaneo parte el tiempo en ventanas de 15 min (`X_WINDOW_MIN`, hasta `X_MAX_WINDOWS` = 3).
+- **Tope diario de gasto:** `X_DAILY_BUDGET_USD` (0,5 por defecto). Un escaneo típico cuesta ≈ 0,01 USD: a ritmo completo son ≈ 0,4 USD/día (≈ 13 USD/mes). Con el bono de 1 USD de twitterapi.io alcanza para unos 2 a 3 días a ese ritmo; para estirarlo sube `X_REFRESH_MIN` a 60 (≈ 0,2 USD/día).
+- **Diagnóstico en una URL:** `https://TU-DOMINIO/api/x-trends/status` muestra qué falta (key, service role, migración, último error) sin revelar secretos.
+
+### Instalar
+1. Supabase → SQL Editor: ejecuta `supabase/migrations/0006_x_scan_robusto.sql`.
+2. Netlify → variables: `TWITTERAPI_IO_KEY` (**regenérala si la compartiste**), `SUPABASE_SERVICE_ROLE_KEY` y, si usas cron, `CRON_SECRET`. Después redespliega: las variables nuevas no se leen hasta el siguiente deploy.
+3. Abre `/api/x-trends/status` y confirma que `hints` esté vacío.
+
+### Qué significa cada error del escaneo
+| Señal | Causa |
+|---|---|
+| `Aún no se ha escaneado X` y `/status` sin errores | Nadie ha abierto la página ni llamado al cron todavía |
+| `twitterKey: false` en `/status` | Falta `TWITTERAPI_IO_KEY` (o no se redesplegó) |
+| `lastError: HTTP 401` o `403` | Key inválida (¿la regeneraste y no actualizaste Netlify?) |
+| `lastError: HTTP 402` | Sin saldo en twitterapi.io |
+| `lastError: HTTP 429` | Demasiadas consultas: con saldo < 1.000 créditos el límite es 1 consulta cada 5 s |
+| Cron responde `401` | El secreto del cron no coincide con `CRON_SECRET` |
+| Cron responde `500` con "Falta CRON_SECRET" | La variable no existe en Netlify |

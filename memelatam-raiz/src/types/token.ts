@@ -46,6 +46,8 @@ export interface Holder {
   amount?: number;
   /** Marcado como insider/sniper por la fuente (RugCheck) */
   isInsider?: boolean;
+  /** Wallet dueña de la cuenta de tokens (RugCheck `owner`) */
+  owner?: string;
 }
 
 export interface HolderStats {
@@ -65,6 +67,10 @@ export interface SecuritySignals {
   freezeAuthorityActive: boolean;
   /** Descripciones de riesgos nivel "danger" reportados por RugCheck */
   dangerRisks: string[];
+  /** Wallet que creó el token (RugCheck). null si la fuente no lo informa. */
+  creator: string | null;
+  /** % del supply que el creador aún tiene entre los top holders (null si no aparece o no se sabe) */
+  creatorHoldingPct: number | null;
 }
 
 /** Metadata de GeckoTerminal. */
