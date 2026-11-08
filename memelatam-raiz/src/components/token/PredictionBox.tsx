@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 import { Hourglass } from 'lucide-react';
@@ -54,7 +55,7 @@ export function PredictionBox({ chain, address, symbol, loggedIn, demo, stats, m
         <Hourglass className="h-5 w-5 text-brand" aria-hidden /> ¿Cuánto va a durar {symbol}?
       </h2>
       <p className="mb-3 text-sm text-muted">
-        Apuesta {formatLatam(PREDICTION_COST)} a que sigue viva (o muerta) cuando pase el plazo. Si aciertas recibes {formatLatam(PREDICTION_PAYOUT)} y subes en el <a href="/ranking" className="text-brand hover:underline">ranking</a>.
+        Apuesta {formatLatam(PREDICTION_COST)} a que sigue viva (o muerta) cuando pase el plazo. Si aciertas recibes {formatLatam(PREDICTION_PAYOUT)} y subes en el <Link href="/predictores" className="text-brand hover:underline">ranking</Link>.
       </p>
 
       {total > 0 && (

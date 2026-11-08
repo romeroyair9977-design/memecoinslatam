@@ -44,6 +44,6 @@ export async function placePrediction(chain: string, address: string, days: numb
   if (error) return { ok: false, error: error.code === 'P0001' ? error.message : 'No se pudo registrar tu predicción.' };
 
   revalidatePath(`/token/${t.address}`);
-  revalidatePath('/ranking');
+  revalidatePath('/predictores');
   return { ok: true };
 }

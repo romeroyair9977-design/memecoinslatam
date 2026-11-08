@@ -7,7 +7,9 @@ import { AdSlot } from '@/components/ads/AdSlot';
 import { ChartPanel } from '@/components/token/ChartPanel';
 import { LivePrice, LiveStats } from '@/components/token/LiveMarketViews';
 import { LiveTokenProvider } from '@/components/token/LiveTokenProvider';
+import { PotentialCard } from '@/components/token/PotentialCard';
 import { PredictionBox } from '@/components/token/PredictionBox';
+import { WhaleImpact } from '@/components/whales/WhaleImpact';
 import { TopTraders } from '@/components/token/TopTraders';
 import { HolderTable } from '@/components/token/HolderTable';
 import { NewsFeed } from '@/components/token/NewsFeed';
@@ -23,6 +25,9 @@ import { getActiveBoosts, getCommunityPeople, getFollowedWallets, getFollowingId
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 import { ADSENSE, SITE } from '@/lib/config';
 import { pairToLive } from '@/lib/live';
+import { potentialScore } from '@/lib/potential';
+import { getCallsForToken } from '@/lib/services/potential';
+import { toWhales, whaleScenarios } from '@/lib/whales';
 import { getMyPredictions, getPredictionStats, type MyPrediction } from '@/lib/services/predictions';
 import { getTokenFull } from '@/lib/services/token';
 import { cn } from '@/lib/utils';
@@ -96,6 +101,21 @@ export default async function TokenPage({ params, searchParams }: Props) {
   ]);
   const role = me && community ? await getRole(community.id, me.id) : null;
   const people = community ? await getCommunityPeople(community.id) : [];
+  // Ballenas (si hay holders uno a uno) y escenario de potencial de Veltrix.
+  const valueUsd = p.marketCap || p.fdv;
+  const whaleList = toWhales(t.holders?.holders ?? [], valueUsd, 5);
+  const whaleRows = whaleScenarios(whaleList, p.liquidityUsd);
+  const pot = potentialScore({
+    marketCap: valueUsd,
+    liquidityUsd: p.liquidityUsd,
+    volume24h: p.volume.h24,
+    buys24h: p.txns.h24.buys,
+    sells24h: p.txns.h24.sells,
+    ageMs: p.pairCreatedAt ? Date.now() - p.pairCreatedAt : null,
+    top10Pct: t.holders?.top10Pct ?? null,
+    activity: t.activity.status,
+  });
+  const calls = demo ? [] : await getCallsForToken(t.chain, t.address);
   const [predStats, myPreds] = await Promise.all([
     demo ? Promise.resolve({ vive: 0, muere: 0 }) : getPredictionStats(key),
     me && !demo ? getMyPredictions(me.id, key) : Promise.resolve([] as MyPrediction[]),
@@ -161,6 +181,8 @@ export default async function TokenPage({ params, searchParams }: Props) {
       {/* Gráfico de velas en vivo (con DexScreener como respaldo) */}
       <ChartPanel chain={p.chainId} pairAddress={p.pairAddress} tokenAddress={t.address} symbol={t.symbol} />
 
+      <PotentialCard symbol={t.symbol} score={pot.score} tier={pot.tier} reasons={pot.reasons} calls={calls} />
+
       <PredictionBox chain={t.chain} address={t.address} symbol={t.symbol} loggedIn={!!me} demo={demo} stats={predStats} mine={myPreds} />
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -186,6 +208,12 @@ export default async function TokenPage({ params, searchParams }: Props) {
           <HolderTable stats={t.holders} chain={t.chain} social={demo ? undefined : { loggedIn: !!me, followed: followedWallets }} />
         </Section>
       </div>
+
+      {whaleList.length > 0 && (
+        <Section title="Si venden las ballenas">
+          <WhaleImpact chain={t.chain} whales={whaleList} scenarios={whaleRows} />
+        </Section>
+      )}
 
       <Section title="Traders más movidos">
         <TopTraders chain={t.chain} pairAddress={p.pairAddress} loggedIn={!!me} followed={followedWallets} canFollow={!demo} />
