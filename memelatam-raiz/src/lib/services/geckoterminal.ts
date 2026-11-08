@@ -99,11 +99,24 @@ export async function getTrendingPoolTokens(chain: string): Promise<ProfileRef[]
   return poolTokens(chain, 'trending_pools');
 }
 
-async function poolTokens(chain: string, kind: 'new_pools' | 'trending_pools'): Promise<ProfileRef[]> {
+/** Pools con más volumen en 24 h (tokens ya establecidos). Dos páginas = 40 pools. */
+export async function getTopPoolTokens(chain: string): Promise<ProfileRef[]> {
+  const pages = await Promise.all([poolTokens(chain, 'top_pools'), poolTokens(chain, 'top_pools_2')]);
+  return pages.flat();
+}
+
+const POOL_PATH = {
+  new_pools: 'new_pools',
+  trending_pools: 'trending_pools',
+  top_pools: 'pools?page=1&sort=h24_volume_usd_desc',
+  top_pools_2: 'pools?page=2&sort=h24_volume_usd_desc',
+} as const;
+
+async function poolTokens(chain: string, kind: keyof typeof POOL_PATH): Promise<ProfileRef[]> {
   const network = toGeckoNetwork(chain);
   if (!network) return [];
   return cached(`gecko:${kind}:${chain}`, TTL.dashboard, async () => {
-    const raw = await fetchJson<RawPools>(`${BASE}/networks/${network}/${kind}`, {
+    const raw = await fetchJson<RawPools>(`${BASE}/networks/${network}/${POOL_PATH[kind]}`, {
       revalidate: 60,
       headers: HEADERS,
     });

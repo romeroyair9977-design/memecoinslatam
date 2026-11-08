@@ -162,3 +162,31 @@ Crea dos tareas HTTP GET con la cabecera `Authorization: Bearer TU_CRON_SECRET`:
 - La página de token se actualiza cada 4 s y su gráfico de velas se mueve con el precio en vivo.
 - El middleware ya no consulta a Supabase en cada visita de usuarios sin sesión, ni en las APIs de datos.
 - Cada fuente externa tiene tope de 4 s: una lenta ya no frena todo el dashboard.
+
+---
+
+# Fase 3c — Mercado (Ranking, Ballenas, Potencial) y menú
+
+## Menú (4 entradas en vez de 8)
+**Tendencias en X · Dashboard · Mercado ▾ (Ranking de memecoins, Ballenas, Potencial) · Comunidad ▾ (Chat y comunidades, Predictores, Actividad)**.
+La antigua ruta `/ranking` redirige a `/predictores`. Se edita en `src/components/layout/MainNav.tsx`.
+
+## Ranking de memecoins por ciclos — `/scan`
+Ciclo 1: 1 a 7 días · Ciclo 2: 7 a 30 días · Ciclo 3: 30+ días (edad del pool principal, solo si sigue viva: liquidez ≥ 5.000 USD y volumen ≥ 1.000 USD/día). En los ciclos 1 y 2 cada token muestra su **opción de llegar al siguiente ciclo** (alta/media/baja) con los motivos. Definiciones y pesos: `src/lib/cycles.ts`.
+
+## Ballenas — `/ballenas` y sección "Si venden las ballenas" en cada token
+Top 5 ballenas con su valor en USD y qué pasa con el precio si venden la #1, las 2, 3 o 5 primeras, con el modelo de pool de producto constante de `src/lib/whales.ts` (caída = 1 − 1/k², k = 1 + 2V/L). **Solo Solana** (RugCheck). "Ballenas ahora" = tokens de 7+ días; "lanzamientos recientes" = menos de 7 días.
+
+## Potencial x10 / x100 / x1000 — `/potencial` y tarjeta en cada token
+Cada token muestra el market cap necesario y la compra neta aproximada para cada múltiplo. Además un cron propone **llamados de Veltrix** con reglas transparentes (`src/lib/potential.ts`: x1000 solo con nota ≥ 80 y MC ≤ 500 K; x100 nota ≥ 65 y MC ≤ 5 M; x10 nota ≥ 52 y MC ≤ 50 M), máximo 2 nuevos por nivel por corrida. Cada llamado se marca **cumplido** (el precio llegó al múltiplo), **fallado** (venció el plazo —30/90/180 días— o el token murió) y el historial es público.
+
+### Instalar
+1. Supabase → SQL Editor: ejecuta `supabase/migrations/0005_potencial.sql`.
+2. Cron nuevo (mismo `CRON_SECRET`), cada 30 min:
+   `GET https://TU-DOMINIO/api/cron/potencial`  con  `Authorization: Bearer TU_CRON_SECRET`.
+3. Ballenas y Ranking no necesitan configuración ni base de datos.
+
+### Límites honestos
+- Los llamados son escenarios, no predicciones: la mayoría de las memecoins pierde valor y un x1000 es rarísimo.
+- El pico se mide en cada corrida del cron; un salto más corto que el intervalo puede no registrarse.
+- Ballenas: RugCheck no cubre EVM; el valor usa market cap × % del supply (ignora tokens bloqueados/quemados).

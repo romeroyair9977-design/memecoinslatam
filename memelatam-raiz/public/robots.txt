@@ -1,8 +1,5 @@
 User-agent: *
 Allow: /
-Disallow: /api/
-Disallow: /admin/
-Disallow: /login
 
 User-agent: Mediapartners-Google
 Allow: /
