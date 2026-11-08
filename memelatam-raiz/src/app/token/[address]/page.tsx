@@ -7,7 +7,9 @@ import { AdSlot } from '@/components/ads/AdSlot';
 import { ChartPanel } from '@/components/token/ChartPanel';
 import { LivePrice, LiveStats } from '@/components/token/LiveMarketViews';
 import { LiveTokenProvider } from '@/components/token/LiveTokenProvider';
+import { ContractLine } from '@/components/token/ContractLine';
 import { PotentialCard } from '@/components/token/PotentialCard';
+import { TeamCard } from '@/components/token/TeamCard';
 import { PredictionBox } from '@/components/token/PredictionBox';
 import { WhaleImpact } from '@/components/whales/WhaleImpact';
 import { TopTraders } from '@/components/token/TopTraders';
@@ -136,6 +138,7 @@ export default async function TokenPage({ params, searchParams }: Props) {
             <RiskBadge level={t.risk.level} score={t.risk.score} />
             <ActivityBadge status={t.activity.status} />
           </div>
+          <div className="mt-2"><ContractLine chain={t.chain} address={t.address} /></div>
         </div>
         <LivePrice />
       </header>
@@ -177,6 +180,10 @@ export default async function TokenPage({ params, searchParams }: Props) {
       )}
 
       <LiveStats dex={p.dexId} totalHolders={t.holders?.totalHolders ?? null} />
+
+      <Section title="¿Quién está detrás?">
+        <TeamCard chain={t.chain} address={t.address} />
+      </Section>
 
       {/* Gráfico de velas en vivo (con DexScreener como respaldo) */}
       <ChartPanel chain={p.chainId} pairAddress={p.pairAddress} tokenAddress={t.address} symbol={t.symbol} />

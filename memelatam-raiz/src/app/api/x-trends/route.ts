@@ -10,8 +10,9 @@ export async function GET(req: Request) {
   const h = Number(new URL(req.url).searchParams.get('hours') ?? 24);
   const hours = h === 1 || h === 6 ? h : 24;
   try {
-    const result = await getXTrends(hours);
-    return NextResponse.json(result, { headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=120' } });
+    const fresh = new URL(req.url).searchParams.get('fresh') === '1';
+    const result = await getXTrends(hours, fresh);
+    return NextResponse.json(result, { headers: { 'Cache-Control': fresh ? 'no-store' : 'public, s-maxage=60, stale-while-revalidate=120' } });
   } catch {
     return NextResponse.json({ error: 'upstream' }, { status: 502 });
   }

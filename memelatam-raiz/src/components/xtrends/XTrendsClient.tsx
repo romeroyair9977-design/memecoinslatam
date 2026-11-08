@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePolling } from '@/lib/hooks/live';
 import { cn, formatAge } from '@/lib/utils';
 import type { XTrendsResult } from '@/types/xtrends';
@@ -27,9 +27,12 @@ export function XTrendsClient() {
   const [data, setData] = useState<XTrendsResult | null>(null);
   const [status, setStatus] = useState<'loading' | 'ok' | 'error' | 'not_configured'>('loading');
 
-  const load = useCallback(async () => {
+  const asked = useRef(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async (fresh = false) => {
     try {
-      const res = await fetch(`/api/x-trends?hours=${hours}`, { cache: 'no-store' });
+      const res = await fetch(`/api/x-trends?hours=${hours}${fresh ? `&fresh=1&_=${Date.now()}` : ''}`, { cache: 'no-store' });
       if (res.status === 503) return setStatus('not_configured');
       if (!res.ok) throw new Error(String(res.status));
       setData((await res.json()) as XTrendsResult);
@@ -41,6 +44,20 @@ export function XTrendsClient() {
 
   useEffect(() => { setStatus('loading'); void load(); }, [load]);
   usePolling(load, 60_000);
+
+  // Si los datos de X tienen más de 30 min (o nunca se escaneó), la página pide una actualización. El servidor la limita
+  // a 1 cada 10 min para todos los visitantes juntos, así que no depende de ningún cron externo ni gasta de más.
+  useEffect(() => {
+    if (status !== 'ok' || !data || asked.current) return;
+    const last = data.lastScanAt ? Date.parse(data.lastScanAt) : 0;
+    if (Date.now() - last < 30 * 60_000) return;
+    asked.current = true;
+    setRefreshing(true);
+    fetch('/api/x-trends/refresh', { method: 'POST' })
+      .then(() => load(true))
+      .catch(() => undefined)
+      .finally(() => setRefreshing(false));
+  }, [status, data, load]);
 
   const items = useMemo(() => {
     if (!data) return [];
@@ -85,7 +102,7 @@ export function XTrendsClient() {
 
       {status === 'ok' && data && (
         <p className="text-xs text-muted" suppressHydrationWarning>
-          {data.lastScanAt ? `Datos de X actualizados ${formatAge(Date.parse(data.lastScanAt))}` : 'Aún no se ha escaneado X'} · {items.length} de {data.items.length} tokens
+          {data.lastScanAt ? `Datos de X actualizados ${formatAge(Date.parse(data.lastScanAt))}` : 'Aún no se ha escaneado X'} · {items.length} de {data.items.length} tokens{refreshing ? ' · actualizando datos de X…' : ''}
         </p>
       )}
 
@@ -100,9 +117,11 @@ export function XTrendsClient() {
       )}
       {status === 'ok' && data && data.items.length === 0 && (
         <p className="rounded-xl border border-dashed border-line p-6 text-sm text-muted">
-          {data.lastScanAt
-            ? 'Todavía no hay suficientes menciones en esta ventana. Prueba con 6 o 24 horas.'
-            : 'Aún no hay datos: el escaneo de X corre cada 15 a 30 minutos. Vuelve en un rato.'}
+          {refreshing
+            ? 'Actualizando los datos de X… esto tarda unos segundos.'
+            : data.lastScanAt
+              ? 'Todavía no hay suficientes menciones en esta ventana. Prueba con 6 o 24 horas: el ranking se llena a medida que pasan los escaneos.'
+              : 'Aún no hay datos de X. La primera actualización se hace sola al abrir esta página; si sigue vacío, revisa /api/x-trends/status.'}
         </p>
       )}
       {status === 'ok' && data && data.items.length > 0 && items.length === 0 && (
