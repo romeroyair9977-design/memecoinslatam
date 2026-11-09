@@ -5,10 +5,12 @@ import { searchTweets, XApiError, type RawTweet } from './xapi';
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Number.isFinite(n) ? n : lo));
 const WINDOW_MIN = clamp(Number(process.env.X_WINDOW_MIN ?? 15), 5, 60);
-const MAX_WINDOWS = clamp(Number(process.env.X_MAX_WINDOWS ?? 3), 1, 8);
+const MAX_WINDOWS = clamp(Number(process.env.X_MAX_WINDOWS ?? 2), 1, 8);
 const DAILY_BUDGET_USD = Number(process.env.X_DAILY_BUDGET_USD ?? 0.5);
-const TIME_BUDGET_MS = 8_000; // las funciones de Netlify cortan a los ~10 s
-const CONCURRENCY = 3;
+const TIME_BUDGET_MS = 6_500; // las funciones de Netlify cortan a los ~10 s
+// twitterapi.io limita las consultas por segundo (HTTP 429): se piden de una en una, con una pausa entre ellas.
+const GAP_MS = clamp(Number(process.env.X_CALL_GAP_MS ?? 1200), 300, 6000);
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 const MAX_LOOKBACK_S = 2 * 3600;
 const COST_PER_UNIT_USD = 0.00015; // por tweet devuelto; mínimo una unidad por llamada
 
@@ -69,23 +71,33 @@ export async function runXScan(): Promise<ScanResult> {
   const tweets: RawTweet[] = [];
   let calls = 0, failed = 0, units = 0, next = 0, fatal = false;
   let firstError: string | undefined;
-  const worker = async () => {
-    while (next < tasks.length && Date.now() < deadline && !fatal) {
-      const query = tasks[next++];
-      calls++;
+  // Una consulta a la vez. Si llega un 429 se espera y se reintenta una vez; si vuelve, se corta el escaneo (ya habrá otro).
+  while (next < tasks.length && deadline - Date.now() > 1_500 && !fatal) {
+    const query = tasks[next++];
+    if (calls > 0) await sleep(GAP_MS);
+    calls++;
+    let attempt = 0;
+    for (;;) {
       try {
         const r = await searchTweets(query);
         tweets.push(...r.tweets);
         units += Math.max(1, r.tweets.length);
+        break;
       } catch (e) {
+        const status = e instanceof XApiError ? e.status : 0;
+        if (status === 429 && attempt === 0 && deadline - Date.now() > 3_500) {
+          attempt++;
+          await sleep(2_000);
+          continue;
+        }
         failed++;
-        const code = e instanceof XApiError ? (e.status ? `HTTP ${e.status}` : e.message) : (e as Error).name === 'AbortError' ? 'timeout' : 'red';
+        const code = e instanceof XApiError ? (status ? `HTTP ${status}` : e.message) : (e as Error).name === 'AbortError' ? 'timeout' : 'red';
         firstError ??= code;
-        if (e instanceof XApiError && [401, 402, 403].includes(e.status)) fatal = true; // clave inválida o sin saldo: no tiene sentido seguir
+        if (status === 429 || [401, 402, 403].includes(status)) fatal = true; // limitado, clave inválida o sin saldo: no tiene sentido seguir
+        break;
       }
     }
-  };
-  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+  }
   const partial = next < tasks.length || failed > 0;
   const estimatedCostUsd = Number((units * COST_PER_UNIT_USD).toFixed(5));
 
