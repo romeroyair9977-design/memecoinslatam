@@ -27,7 +27,8 @@ export class XApiError extends Error {
   }
 }
 
-export async function searchTweets(query: string, cursor?: string): Promise<{ tweets: RawTweet[]; next: string | null }> {
+/** `timeoutMs`: tiempo máximo de esta consulta. El escaneo lo ajusta al tiempo que le queda para no pasarse del límite de Netlify. */
+export async function searchTweets(query: string, cursor?: string, timeoutMs = 7_000): Promise<{ tweets: RawTweet[]; next: string | null }> {
   const key = process.env.TWITTERAPI_IO_KEY;
   if (!key) throw new XApiError(0, 'Falta la variable TWITTERAPI_IO_KEY');
 
@@ -35,7 +36,7 @@ export async function searchTweets(query: string, cursor?: string): Promise<{ tw
   if (cursor) params.set('cursor', cursor);
 
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 7_000); // las funciones de Netlify cortan a los ~10 s
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
   try {
     const res = await fetch(`${BASE}/twitter/tweet/advanced_search?${params.toString()}`, {
       headers: { 'X-API-Key': key, accept: 'application/json' },
