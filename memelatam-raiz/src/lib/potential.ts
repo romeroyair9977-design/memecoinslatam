@@ -7,7 +7,23 @@ export const MULTIPLES = [10, 100, 1000] as const;
 export type Multiple = (typeof MULTIPLES)[number];
 
 /** Plazo de cada llamado: pasado ese tiempo sin llegar a la meta, se marca como fallado. */
-export const CALL_DAYS: Record<Multiple, number> = { 10: 30, 100: 90, 1000: 180 };
+export const CALL_DAYS: Record<Multiple, number> = { 10: 7, 100: 30, 1000: 90 };
+
+/**
+ * Llamados v2 (se publican solos, sin cron externo): monedas NUEVAS con FOMO real y seguridad básica.
+ * El múltiplo posible depende del market cap de entrada: x10 desde ≤ 1 M, x100 desde ≤ 100 K, x1000 desde ≤ 25 K.
+ * Un mismo token puede abrir varios niveles a la vez (x10, x100, x1000) desde la misma entrada.
+ */
+export const CALL_MAX_MC: Record<Multiple, number> = { 10: 1_000_000, 100: 100_000, 1000: 25_000 };
+export const MIN_CALL_FOMO = 55;
+export const MIN_CALL_LIQ = 8_000;
+export const MIN_CALL_BUY_SHARE = 0.55;
+export const MAX_CALL_AGE_MS = 72 * 3_600_000;
+export const MAX_CALL_TOP10 = 60;
+
+export function callTiers(marketCap: number): Multiple[] {
+  return MULTIPLES.filter((m) => marketCap > 0 && marketCap <= CALL_MAX_MC[m]);
+}
 
 /** Market cap máximo razonable para una meta (500 M USD): evita llamados absurdos. */
 export const MAX_TARGET_MC = 500_000_000;

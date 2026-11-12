@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { AdSlot } from '@/components/ads/AdSlot';
+import { JobPinger } from '@/components/jobs/JobPinger';
 import { ALIVE_RULE, PREDICTION_COST, PREDICTION_PAYOUT } from '@/lib/predictions';
 import { ADSENSE } from '@/lib/config';
 import { formatLatam } from '@/lib/latam';
@@ -66,6 +67,7 @@ export default async function RankingPage() {
         </div>
       )}
 
+      <JobPinger />
       <AdSlot slot={ADSENSE.slotRanking} />
     </div>
   );

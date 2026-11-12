@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { JobPinger } from '@/components/jobs/JobPinger';
 import { PotentialBoard } from '@/components/potential/PotentialBoard';
 import { getCalls } from '@/lib/services/potential';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
@@ -16,12 +17,13 @@ export default async function PotentialPage() {
       <header className="space-y-2">
         <h1 className="font-display text-3xl font-bold">Potencial</h1>
         <p className="max-w-3xl text-muted">
-          Memecoins que Veltrix ve con escenario de x10, x100 o x1000. Cada llamado queda guardado con su fecha, el market cap de entrada y la meta, y después se marca como cumplido o fallado. El historial es público para que puedas juzgar cuánto aciertan estos llamados.
+          Memecoins nuevas con FOMO real que Veltrix sigue desde su entrada, por niveles de x10, x100 y x1000. Cada llamado queda guardado con su fecha, el market cap de entrada y la meta, y después se marca como cumplido o fallado. El historial es público para que puedas juzgar cuánto aciertan estos llamados.
         </p>
         <p className="max-w-3xl text-xs text-muted">
-          Un x1000 es rarísimo y solo se publica si el token es muy pequeño y cumple criterios estrictos. Son escenarios con reglas transparentes (liquidez, volumen, compras, holders, actividad), no promesas ni asesoría financiera. La mayoría de las memecoins pierde valor.
+          Se publican solos, con reglas visibles: moneda de menos de 72 horas, liquidez de al menos 8.000 USD, FOMO alto con mayoría de compras y, en Solana, sin mint ni freeze activos y con el top 10 por debajo de 60%. Un x10 parte de market caps de hasta 1 M, un x100 de hasta 100 K y un x1000 de hasta 25 K. Son escenarios, no promesas ni asesoría financiera: la mayoría de las memecoins pierde valor.
         </p>
       </header>
+      <JobPinger />
       {isSupabaseConfigured ? (
         <PotentialBoard calls={calls} />
       ) : (

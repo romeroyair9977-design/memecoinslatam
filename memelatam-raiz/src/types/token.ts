@@ -181,6 +181,8 @@ export interface LiveMarket {
   pairAddress: string;
   pairCreatedAt: number | null;
   updatedAt: number;
+  /** compras, ventas y volumen por ventana (5 min, 1 h, 6 h, 24 h) */
+  flow: Record<TimeWindow, { buys: number; sells: number; volume: number }>;
 }
 
 export interface Candle { time: number; open: number; high: number; low: number; close: number; volume: number }

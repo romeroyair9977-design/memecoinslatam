@@ -11,7 +11,7 @@ interface Props {
   defaultValue?: string;
 }
 
-/** Busca por contract address (Solana o EVM). La chain se autodetecta en el servidor. Se vacía al enviar. */
+/** Busca por contract address (Solana o EVM) o por nombre/símbolo. La chain se autodetecta en el servidor. Se vacía al enviar. */
 export function SearchBar({ size = 'lg', defaultValue = '' }: Props) {
   const router = useRouter();
   const [value, setValue] = useState(defaultValue);
@@ -20,12 +20,14 @@ export function SearchBar({ size = 'lg', defaultValue = '' }: Props) {
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     const v = value.trim();
-    if (!detectAddressKind(v)) {
-      setError('Pega un contract address válido (Solana o EVM que empiece con 0x).');
+    const isAddress = detectAddressKind(v) !== null;
+    if (!isAddress && v.length < 2) {
+      setError('Escribe el nombre o símbolo de la memecoin (mínimo 2 letras) o pega su contract address.');
       return;
     }
     setError(null);
-    router.push(`/token/${v}`);
+    // Contrato → análisis directo. Nombre o símbolo → lista de resultados para elegir el token correcto.
+    router.push(isAddress ? `/token/${v}` : `/buscar?q=${encodeURIComponent(v)}`);
     setValue(''); // se borra de inmediato: nadie queda con el contrato pegado en la barra
     (document.activeElement as HTMLElement | null)?.blur?.();
   }
@@ -37,8 +39,8 @@ export function SearchBar({ size = 'lg', defaultValue = '' }: Props) {
         <input
           value={value}
           onChange={(e) => { setValue(e.target.value); if (error) setError(null); }}
-          placeholder="Pega un contract address…"
-          aria-label="Contract address del token"
+          placeholder="Contrato o nombre (ej. TERESA)…"
+          aria-label="Contract address, nombre o símbolo del token"
           spellCheck={false}
           autoComplete="off"
           className={cn(

@@ -230,3 +230,27 @@ Costo: ≈ 0,0003 USD por informe (un perfil + una búsqueda), con cache de 6 h 
 | `lastError: HTTP 429` | Demasiadas consultas: con saldo < 1.000 créditos el límite es 1 consulta cada 5 s |
 | Cron responde `401` | El secreto del cron no coincide con `CRON_SECRET` |
 | Cron responde `500` con "Falta CRON_SECRET" | La variable no existe en Netlify |
+
+---
+
+# Fase 3e — FOMO en vivo, niveles e impulso, "Mi entrada", búsqueda por nombre y Potencial v2
+
+## Qué hay de nuevo
+- **FOMO en vivo (`/fomo`, menú Mercado):** ranking que se actualiza cada 10 s con las memecoins donde más rápido entran compras. Mide compras por minuto en los últimos 5 min, aceleración frente al resto de la hora, % de compras y volumen. Red ancha: dashboard + pools nuevos, en tendencia y con más transacciones (2 páginas de cada uno, Solana y Base). Filtros: Solana, Base, agentes de IA, con cuenta de X, nuevas. Orden: «Más FOMO» o «Mejor calidad» (FOMO + equipo visible + liquidez). Fórmula y límites: `src/lib/momentum.ts`.
+- **Niveles e impulso (en cada token):** desde el primer dato de precio, en niveles de 10 en 10 (x10, x100, x1000, x10000): «salió en» (aprox.), pico, caída desde el pico y la fecha de cada nivel. Estado de impulso (*Acelerando / Sostenido / Enfriándose / Colapsando*) con un mensaje y sus motivos. Si el token tiene mint o freeze activos o el top 10 pasa de 60 %, **no** se anima a seguir subiendo.
+- **Mi entrada:** sin cuenta, en tu navegador: pones tu market cap (o precio) de entrada y cuánto invertiste y calcula tu múltiplo, el siguiente nivel y lo que realmente te pagaría el pool si vendes ahora (con deslizamiento).
+- **Búsqueda por nombre o símbolo:** la barra acepta «TERESA»; abre `/buscar` con los tokens que coinciden, ordenados por liquidez, para elegir el correcto (hay imitaciones: revisa «¿Quién está detrás?»).
+- **Potencial v2:** los llamados se publican **solos** (sin cron externo) desde el ranking de FOMO: moneda de menos de 72 h, liquidez ≥ 8 K, FOMO ≥ 55, mayoría de compras y, en Solana, sin mint/freeze y top 10 ≤ 60 % (sin datos de seguridad no se publica). Un mismo token abre x10 (MC ≤ 1 M), x100 (MC ≤ 100 K) y x1000 (MC ≤ 25 K) desde la misma entrada. Plazos 7 / 30 / 90 días. Se revisan por precio y por velas de 1 h.
+- **Tareas automáticas:** al abrir el sitio se dispara (máx. 1 vez cada 10 min para todos) la tarea de Potencial y (1 vez por hora) la resolución de predicciones. El cron externo pasa a ser opcional.
+
+## Instalar
+1. Supabase → SQL Editor: ejecuta `supabase/migrations/0007_tareas_y_llamados.sql`.
+2. Sube los archivos y deja un solo deploy.
+3. Abre la home una vez: eso dispara la primera corrida de Potencial. Los llamados aparecen en `/potencial` cuando haya monedas que cumplan todos los criterios.
+
+## Límites honestos
+- La ventana más corta de la fuente es de 5 minutos (no hay datos «por segundo») y se cuentan **compras**, no personas distintas.
+- «Salió en» se estima con la primera vela diaria disponible; para tokens que migraron de pump.fun puede no ser el precio de lanzamiento.
+- Los mensajes de impulso son **señales, no órdenes**: una señal de salida llega cuando el precio ya empezó a bajar.
+- «Posible IA» se detecta por palabras en el nombre o la descripción: puede fallar.
+- Las fuentes son gratuitas (DexScreener y GeckoTerminal): cobertura amplia, no total.

@@ -17,6 +17,7 @@ const GROUPS: Group[] = [
     id: 'mercado',
     label: 'Mercado',
     items: [
+      { href: '/fomo', label: 'FOMO en vivo' },
       { href: '/scan', label: 'Ranking de memecoins' },
       { href: '/ballenas', label: 'Ballenas' },
       { href: '/potencial', label: 'Potencial x10 · x100 · x1000' },

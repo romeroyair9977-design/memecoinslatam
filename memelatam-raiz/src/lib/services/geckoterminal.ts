@@ -110,12 +110,25 @@ const POOL_PATH = {
   trending_pools: 'trending_pools',
   top_pools: 'pools?page=1&sort=h24_volume_usd_desc',
   top_pools_2: 'pools?page=2&sort=h24_volume_usd_desc',
+  new_pools_2: 'new_pools?page=2',
+  trending_pools_2: 'trending_pools?page=2',
+  tx_pools: 'pools?page=1&sort=h24_tx_count_desc',
+  tx_pools_2: 'pools?page=2&sort=h24_tx_count_desc',
 } as const;
+
+/** Red ancha para el ranking de FOMO: pools nuevos, en tendencia y con más transacciones (2 páginas de cada uno). */
+export async function getWideTokenRefs(chain: string): Promise<ProfileRef[]> {
+  const kinds = ['new_pools', 'new_pools_2', 'trending_pools', 'trending_pools_2', 'tx_pools', 'tx_pools_2'] as const;
+  const settled = await Promise.allSettled(kinds.map((k) => poolTokens(chain, k)));
+  return settled.flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
+}
 
 async function poolTokens(chain: string, kind: keyof typeof POOL_PATH): Promise<ProfileRef[]> {
   const network = toGeckoNetwork(chain);
   if (!network) return [];
-  return cached(`gecko:${kind}:${chain}`, TTL.dashboard, async () => {
+  // Las páginas extra se guardan 60 s (GeckoTerminal gratis permite ~30 consultas por minuto).
+  const ttl = kind.endsWith('_2') || kind === 'tx_pools' ? 60_000 : TTL.dashboard;
+  return cached(`gecko:${kind}:${chain}`, ttl, async () => {
     const raw = await fetchJson<RawPools>(`${BASE}/networks/${network}/${POOL_PATH[kind]}`, {
       revalidate: 60,
       headers: HEADERS,

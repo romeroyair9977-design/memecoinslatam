@@ -3,6 +3,7 @@
  * 60 req/min en perfiles/boosts. Docs: https://docs.dexscreener.com/api/reference
  */
 import { cached, } from '../cache';
+import { looksAi } from '../ai';
 import { cacheSafeAddress } from '../addresses';
 import { TTL } from '../config';
 import { fetchJson } from '../http';
@@ -37,7 +38,11 @@ interface RawPair {
 }
 
 export interface ProfileRef { chain: string; address: string; }
-interface RawProfile { chainId: string; tokenAddress: string }
+interface RawProfile { chainId: string; tokenAddress: string; description?: string }
+
+/** Tokens cuya descripción de perfil menciona IA/agentes (se llena al leer los perfiles recientes). */
+const aiHinted = new Set<string>();
+export const isAiHinted = (chain: string, address: string) => aiHinted.has(`${chain}:${address.toLowerCase()}`);
 
 /* ───────────── Normalización ───────────── */
 const WINDOWS: TimeWindow[] = ['m5', 'h1', 'h6', 'h24'];
@@ -131,7 +136,10 @@ export async function getCandidateRefs(): Promise<ProfileRef[]> {
   const refs: ProfileRef[] = [];
   for (const r of results) {
     if (r.status !== 'fulfilled' || !Array.isArray(r.value)) continue;
-    for (const item of r.value) refs.push({ chain: item.chainId, address: item.tokenAddress });
+    for (const item of r.value) {
+      refs.push({ chain: item.chainId, address: item.tokenAddress });
+      if (item.description && looksAi(item.description)) aiHinted.add(`${item.chainId}:${item.tokenAddress.toLowerCase()}`);
+    }
   }
   return refs;
 }
