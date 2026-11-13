@@ -3,7 +3,6 @@ import { ActivityFeed } from '@/components/activity/ActivityFeed';
 import { CommunityList } from '@/components/community/parts';
 import { SearchBar } from '@/components/search/SearchBar';
 import { AdSlot } from '@/components/ads/AdSlot';
-import { JobPinger } from '@/components/jobs/JobPinger';
 import { ADSENSE } from '@/lib/config';
 import { LiveDashboard } from '@/components/dashboard/LiveDashboard';
 import { MOCK_ACTIVITY, MOCK_MESSAGES, MOCK_TOP_COMMUNITIES } from '@/lib/mock';
@@ -45,7 +44,6 @@ export default async function HomePage() {
 
       <LiveDashboard initial={dash} memberCounts={demo ? undefined : memberCounts} boosts={demo ? undefined : boosts} />
 
-      <JobPinger />
       <AdSlot slot={ADSENSE.slotHome} />
 
       <section id="comunidad" className="scroll-mt-20 grid gap-6 lg:grid-cols-3">

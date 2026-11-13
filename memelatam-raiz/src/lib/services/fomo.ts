@@ -3,6 +3,7 @@ import { cached } from '../cache';
 import { cacheSafeAddress } from '../addresses';
 import { looksAi } from '../ai';
 import { isSupportedChain } from '../chains';
+import { detectManipulation } from '../manipulation';
 import { computeMomentum, flowFromPair } from '../momentum';
 import { getDashboard } from './dashboard';
 import { getTokensBatch, isAiHinted, pickPrimaryPair, type ProfileRef } from './dexscreener';
@@ -70,6 +71,7 @@ export function getFomoBoard(): Promise<FomoBoard> {
       if (mc <= 0) continue;
       const ageMs = main.pairCreatedAt ? now - main.pairCreatedAt : null;
       const m = computeMomentum({ flow: flowFromPair(main), ageMs, liquidityUsd: main.liquidityUsd, priceChangeM5: main.priceChange.m5 });
+      const manip = detectManipulation({ flow: flowFromPair(main), liquidityUsd: main.liquidityUsd, priceChangeM5: main.priceChange.m5 });
       const hasX = main.socials.some((s) => s.type === 'twitter');
       const hasWebsite = main.websites.length > 0;
       items.push({
@@ -93,15 +95,19 @@ export function getFomoBoard(): Promise<FomoBoard> {
         buyShare5: m.buyShare5,
         state: m.state,
         fomo: m.fomo,
-        quality: Math.round(0.55 * m.fomo + (hasX ? 12 : 0) + (hasWebsite ? 8 : 0) + 25 * clamp01(Math.log10(Math.max(main.liquidityUsd, 1) / 5_000) / 1.5)),
+        quality: Math.max(0, Math.round(0.55 * m.fomo + (hasX ? 12 : 0) + (hasWebsite ? 8 : 0) + 25 * clamp01(Math.log10(Math.max(main.liquidityUsd, 1) / 5_000) / 1.5) - (manip.suspicious ? 30 : 0))),
         reasons: m.reasons,
         hasX,
         hasWebsite,
         ai: looksAi(main.baseToken.name, main.baseToken.symbol) || isAiHinted(main.chainId, main.baseToken.address),
         top10Pct: top10.get(k) ?? null,
+        suspicious: manip.suspicious,
+        flags: manip.flags,
       });
     }
-    items.sort((a, b) => b.fomo - a.fomo);
+    // Las sospechosas se muestran, pero valen la mitad al ordenar.
+    const rank = (i: FomoItem) => (i.suspicious ? i.fomo * 0.5 : i.fomo);
+    items.sort((a, b) => rank(b) - rank(a));
     return { items: items.slice(0, 120), scanned: grouped.size, updatedAt: now };
   });
 }

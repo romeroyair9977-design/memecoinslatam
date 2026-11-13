@@ -4,6 +4,7 @@ import Script from 'next/script';
 import { UserProvider } from '@/components/auth/UserProvider';
 import { Header } from '@/components/layout/Header';
 import { Footer } from '@/components/layout/Footer';
+import { JobPinger } from '@/components/jobs/JobPinger';
 import { ADSENSE, PARENT, SITE } from '@/lib/config';
 import './globals.css';
 
@@ -39,7 +40,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body className="flex min-h-screen flex-col">
         <UserProvider>
-          <Header />
+          <JobPinger />
+        <Header />
           <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6">{children}</main>
           <Footer />
         </UserProvider>

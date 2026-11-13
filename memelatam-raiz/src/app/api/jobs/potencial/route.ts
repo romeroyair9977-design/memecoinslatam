@@ -14,7 +14,7 @@ export async function POST() {
   if (!claimed) return NextResponse.json({ ok: claimed !== null, ran: false });
   try {
     const r = await runPotencial();
-    await finishJob('potencial', r.ok ? null : r.reason ?? 'error');
+    await finishJob('potencial', r.ok ? null : r.reason ?? 'error', r.diag ?? undefined);
     return NextResponse.json({ ok: r.ok, ran: true });
   } catch {
     await finishJob('potencial', 'excepcion');

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
-import { JobPinger } from '@/components/jobs/JobPinger';
 import { PotentialBoard } from '@/components/potential/PotentialBoard';
+import { PotentialDiagnostics } from '@/components/potential/PotentialDiagnostics';
 import { getCalls } from '@/lib/services/potential';
 import { isSupabaseConfigured } from '@/lib/supabase/env';
 
@@ -23,9 +23,11 @@ export default async function PotentialPage() {
           Se publican solos, con reglas visibles: moneda de menos de 72 horas, liquidez de al menos 8.000 USD, FOMO alto con mayoría de compras y, en Solana, sin mint ni freeze activos y con el top 10 por debajo de 60%. Un x10 parte de market caps de hasta 1 M, un x100 de hasta 100 K y un x1000 de hasta 25 K. Son escenarios, no promesas ni asesoría financiera: la mayoría de las memecoins pierde valor.
         </p>
       </header>
-      <JobPinger />
       {isSupabaseConfigured ? (
-        <PotentialBoard calls={calls} />
+        <>
+          <PotentialBoard calls={calls} />
+          <PotentialDiagnostics />
+        </>
       ) : (
         <p className="rounded-xl border border-dashed border-line p-6 text-sm text-muted">Esta sección se activa al conectar Supabase y configurar el cron de Potencial (ver README).</p>
       )}

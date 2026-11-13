@@ -100,5 +100,8 @@ export interface FomoItem {
   hasWebsite: boolean;
   ai: boolean;
   top10Pct: number | null;
+  /** Señales de FOMO posiblemente fabricado (ver src/lib/manipulation.ts) */
+  suspicious: boolean;
+  flags: string[];
 }
 export interface FomoBoard { items: FomoItem[]; scanned: number; updatedAt: number }

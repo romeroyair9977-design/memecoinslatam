@@ -13,8 +13,10 @@ export async function claimJob(key: string, minMinutes: number): Promise<boolean
   return Boolean(data);
 }
 
-export async function finishJob(key: string, error: string | null): Promise<void> {
+export async function finishJob(key: string, error: string | null, details?: unknown): Promise<void> {
   const admin = createAdminSupabase();
   if (!admin) return;
   await admin.from('app_jobs').update({ last_finished: new Date().toISOString(), last_error: error }).eq('key', key);
+  // `details` llega con la migración 0008: si aún no existe, este segundo paso falla en silencio y lo demás sigue igual.
+  if (details !== undefined) await admin.from('app_jobs').update({ details }).eq('key', key);
 }

@@ -17,13 +17,14 @@ const STATE_CLS: Record<MomentumState, string> = {
   colapsando: 'border-rose-500/40 bg-rose-500/10 text-rose-300',
 };
 
-type Filters = { solana: boolean; base: boolean; ai: boolean; team: boolean; fresh: boolean };
+type Filters = { solana: boolean; base: boolean; ai: boolean; team: boolean; fresh: boolean; clean: boolean };
 const FILTERS: { id: keyof Filters; label: string }[] = [
   { id: 'solana', label: 'Solo Solana' },
   { id: 'base', label: 'Solo Base' },
   { id: 'ai', label: 'Solo agentes de IA' },
   { id: 'team', label: 'Con cuenta de X' },
   { id: 'fresh', label: 'Nuevas (menos de 24 h)' },
+  { id: 'clean', label: 'Ocultar sospechosas' },
 ];
 
 function Row({ t, rank }: { t: FomoItem; rank: number }) {
@@ -38,6 +39,7 @@ function Row({ t, rank }: { t: FomoItem; rank: number }) {
           <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted">
             <span>{chainLabel(t.chain)} · {t.dex} · <Age ts={t.pairCreatedAt} /></span>
             {t.ai && <span className="rounded border border-brand/40 px-1 text-brand">posible IA</span>}
+            {t.suspicious && <span className="rounded border border-rose-500/40 bg-rose-500/10 px-1 text-rose-300">posible manipulación</span>}
             <span className={cn('rounded border px-1', t.hasX ? 'border-emerald-500/30 text-emerald-300' : 'border-line')}>{team}</span>
           </p>
         </div>
@@ -65,6 +67,11 @@ function Row({ t, rank }: { t: FomoItem; rank: number }) {
         </div>
         <Link href={`/token/${t.address}?chain=${t.chain}`} className="rounded-lg bg-brand px-3 py-1.5 text-sm font-medium text-bg hover:bg-brand-dim">Analizar</Link>
       </div>
+      {t.suspicious && t.flags.length > 0 && (
+        <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-2 text-xs text-rose-300">
+          {t.flags.map((f) => <li key={f}>- {f}</li>)}
+        </ul>
+      )}
     </li>
   );
 }
@@ -72,7 +79,7 @@ function Row({ t, rank }: { t: FomoItem; rank: number }) {
 export function FomoClient() {
   const [board, setBoard] = useState<FomoBoard | null>(null);
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading');
-  const [filters, setFilters] = useState<Filters>({ solana: false, base: false, ai: false, team: false, fresh: false });
+  const [filters, setFilters] = useState<Filters>({ solana: false, base: false, ai: false, team: false, fresh: false, clean: false });
   const [sort, setSort] = useState<'fomo' | 'quality'>('fomo');
 
   const load = useCallback(async () => {
@@ -92,8 +99,8 @@ export function FomoClient() {
     const chains = [filters.solana && 'solana', filters.base && 'base'].filter(Boolean) as string[];
     const now = Date.now();
     return (board?.items ?? [])
-      .filter((t) => (chains.length === 0 || chains.includes(t.chain)) && (!filters.ai || t.ai) && (!filters.team || t.hasX) && (!filters.fresh || (t.pairCreatedAt !== null && now - t.pairCreatedAt < 86_400_000)))
-      .sort((a, b) => (sort === 'fomo' ? b.fomo - a.fomo : b.quality - a.quality))
+      .filter((t) => (chains.length === 0 || chains.includes(t.chain)) && (!filters.ai || t.ai) && (!filters.team || t.hasX) && (!filters.clean || !t.suspicious) && (!filters.fresh || (t.pairCreatedAt !== null && now - t.pairCreatedAt < 86_400_000)))
+      .sort((a, b) => (sort === 'fomo' ? (b.suspicious ? b.fomo * 0.5 : b.fomo) - (a.suspicious ? a.fomo * 0.5 : a.fomo) : b.quality - a.quality))
       .slice(0, 60);
   }, [board, filters, sort]);
 
